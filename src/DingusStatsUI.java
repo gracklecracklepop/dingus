@@ -106,7 +106,7 @@ public class DingusStatsUI extends JFrame {
 
         enrichButton.addActionListener(e -> {
             // Open random URL
-            boolean success = webUrlGrabber.openURL("https://en.wikipedia.org/wiki/Special:Random");
+            boolean success = webUrlGrabber.openURL("https://images.unsplash.com/photo-1533460004989-cef01064af7e?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1yZWxhdGVkfDIzfHx8ZW58MHx8fHx8&fm=jpg&q=60&w=3000");
             if (success) {
                 enrichmentBar.setValue(Math.min(100, enrichmentBar.getValue() + 25));
                 updateStatus();
