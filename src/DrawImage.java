@@ -10,7 +10,7 @@ public class DrawImage extends JPanel {
 
     public DrawImage() {
         try {
-            image = ImageIO.read(new File("src/pngimg.com - cat_PNG115412.png"));
+            image = ImageIO.read(new File("images/pngimg.com - cat_PNG115412.png"));
         } catch (IOException e) {
             e.printStackTrace();
         }
