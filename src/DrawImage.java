@@ -65,5 +65,6 @@ public class DrawImage extends JPanel {
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setVisible(true);
         frame.setResizable(false);
+        frame.setAlwaysOnTop(true);
     }
 }
