@@ -1,6 +1,7 @@
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -25,8 +26,34 @@ public class DrawImage extends JPanel {
     public static void main(String[] args) {
         JFrame frame = new JFrame("Cat");
         DrawImage panel = new DrawImage();
+
+        frame.setUndecorated(true);
+        frame.setBackground(new Color(0, 0, 0, 0));
+        panel.setOpaque(false);
+
+        // Track the offset where the user clicked
+        final Point[] clickOffset = {null};
+
+        panel.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                clickOffset[0] = e.getPoint(); // record where on the image you grabbed
+            }
+        });
+
+        panel.addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                Point frameLocation = frame.getLocation();
+                frame.setLocation(
+                        frameLocation.x + e.getX() - clickOffset[0].x,
+                        frameLocation.y + e.getY() - clickOffset[0].y
+                );
+            }
+        });
+
         frame.add(panel);
-        frame.setSize(360 , 270);
+        frame.setSize(360, 270);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setVisible(true);
         frame.setResizable(false);
