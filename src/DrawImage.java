@@ -54,6 +54,14 @@ public class DrawImage extends JPanel {
 
         frame.add(panel);
         frame.setSize(360, 270);
+        // Get screen size
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+
+// Position at bottom right
+        frame.setLocation(
+                screenSize.width - frame.getWidth(),
+                screenSize.height - frame.getHeight()-15
+        );
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setVisible(true);
         frame.setResizable(false);
