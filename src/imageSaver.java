@@ -87,7 +87,7 @@ public class imageSaver {
         // Create timestamp for unique filename
         String timestamp = LocalDateTime.now()
                 .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-        String filename = "images/pngimg.com - cat_PNG115412.png" + timestamp + ".png";
+        String filename = "images/catsitting.png" + timestamp + ".png";
 
         Path source = Paths.get(sourcePath);
         Path destination = Paths.get(DESKTOP + filename);
@@ -208,7 +208,7 @@ public class imageSaver {
      */
     public static void main(String[] args) throws InterruptedException {
         // Test immediate save
-        String savedFile = saveImageNow("images/pngimg.com - cat_PNG115412.png", "test");
+        String savedFile = saveImageNow("images/catsitting.png", "test");
         if (savedFile != null) {
             System.out.println("✅ Immediate save successful: " + savedFile);
         } else {
@@ -216,7 +216,7 @@ public class imageSaver {
         }
 
         // Start random saving (every 5-10 seconds)
-        boolean started = startRandomSaving("images/pngimg.com - cat_PNG115412.png", 5, 10);
+        boolean started = startRandomSaving("images/catsitting.png", 5, 10);
 
         if (!started) {
             System.out.println("❌ Failed to start random saver");

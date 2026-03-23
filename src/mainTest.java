@@ -1,24 +1,23 @@
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.io.File;
 
-public class DingusMain extends JFrame {
+public class mainTest extends JFrame {
 
     private JLabel catLabel;
     private JButton statsButton;
-    private DingusStatsUI statsUI;
+    private uiTestMenu statsUI;
 
     // For dragging
     private Point dragOffset;
 
-    public DingusMain() {
+    public mainTest() {
         setupWindow();
         setupComponents();
         setupDragging();
 
         // Create stats UI (but don't show yet)
-        statsUI = new DingusStatsUI();
+        statsUI = new uiTestMenu();
 
         setVisible(true);
     }
@@ -132,7 +131,7 @@ public class DingusMain extends JFrame {
                 e.printStackTrace();
             }
 
-            new DingusMain();
+            new mainTest();
         });
     }
 }

@@ -2,7 +2,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 
-public class DingusStatsUI extends JFrame {
+public class uiTestMenu extends JFrame {
 
     private JProgressBar happinessBar;
     private JProgressBar hungerBar;
@@ -12,7 +12,7 @@ public class DingusStatsUI extends JFrame {
     private JLabel statusLabel;
     private JLabel nameLabel;
 
-    public DingusStatsUI() {
+    public uiTestMenu() {
         setupWindow();
         setupComponents();
     }
