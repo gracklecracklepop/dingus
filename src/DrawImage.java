@@ -7,20 +7,29 @@ import java.io.File;
 import java.io.IOException;
 
 public class DrawImage extends JPanel {
-    private BufferedImage image;
+    private BufferedImage normalImage;
+    private BufferedImage dragImage;
+    private BufferedImage currentImage;
 
     public DrawImage() {
         try {
-            image = ImageIO.read(new File("images/pngimg.com - cat_PNG115412.png"));
+            normalImage = ImageIO.read(new File("images/pngimg.com - cat_PNG115412.png"));
+            dragImage = ImageIO.read(new File("images/catscruff.jpg"));
+            currentImage = normalImage;
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
+    public void setDragging(boolean isDragging) {
+        currentImage = isDragging ? dragImage : normalImage;
+        repaint();
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        g.drawImage(image, 0, 0, getWidth(), getHeight(), this);
+        g.drawImage(currentImage, 0, 0, getWidth(), getHeight(), this);
     }
 
     public static void main(String[] args) {
@@ -31,13 +40,18 @@ public class DrawImage extends JPanel {
         frame.setBackground(new Color(0, 0, 0, 0));
         panel.setOpaque(false);
 
-        // Track the offset where the user clicked
         final Point[] clickOffset = {null};
 
         panel.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                clickOffset[0] = e.getPoint(); // record where on the image you grabbed
+                clickOffset[0] = e.getPoint();
+                panel.setDragging(true);  // Change to drag image
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                panel.setDragging(false);  // Change back to normal
             }
         });
 
@@ -54,14 +68,8 @@ public class DrawImage extends JPanel {
 
         frame.add(panel);
         frame.setSize(360, 270);
-        // Get screen size
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-
-// Position at bottom right
-        frame.setLocation(
-                screenSize.width - frame.getWidth(),
-                screenSize.height - frame.getHeight()-15
-        );
+        frame.setLocation(screenSize.width - frame.getWidth(), screenSize.height - frame.getHeight() - 15);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setVisible(true);
         frame.setResizable(false);
