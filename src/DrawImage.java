@@ -24,7 +24,7 @@ public class DrawImage extends JPanel {
 
     public DrawImage(JFrame frame) {
         this.parentFrame = frame;
-        setPreferredSize(new Dimension(PET_WIDTH, PET_HEIGHT));
+        //setPreferredSize(new Dimension(PET_WIDTH, PET_HEIGHT));
         setLayout(null);  // Null layout to position button manually
 
         try {
