@@ -37,6 +37,9 @@ public class DrawImage extends JPanel {
     // Track dragging state for button visibility
     private boolean currentlyDragging = false;
 
+    // Pet stats save system
+    private PetStats stats;
+
     public DrawImage(Window window) {
         this.parentWindow = window;
         setLayout(null);
@@ -48,6 +51,9 @@ public class DrawImage extends JPanel {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        // Load saved stats (or create fresh ones if no save exists)
+        this.stats = SaveManager.load();
 
         initializeGrassImages();
         createMenuPanel();
@@ -146,37 +152,53 @@ public class DrawImage extends JPanel {
         menuPanel.add(titleLabel);
         menuPanel.add(Box.createVerticalStrut(10));
 
-        JButton feedButton = createMenuButton("🍖 Feed");
-        JButton playButton = createMenuButton("🎾 Play");
-        JButton sleepButton = createMenuButton("😴 Sleep");
+        JButton feedButton     = createMenuButton("🍖 Feed");
+        JButton playButton     = createMenuButton("🎾 Play");
+        JButton sleepButton    = createMenuButton("😴 Sleep");
         JButton settingsButton = createMenuButton("⚙️ Settings");
-        JButton hideButton = createMenuButton("👁 Hide");
-        JButton exitButton = createMenuButton("❌ Exit");
+        JButton hideButton     = createMenuButton("👁 Hide");
+        JButton exitButton     = createMenuButton("❌ Exit");
 
+        // Feed: restore hunger + happiness, earn a few coins
         feedButton.addActionListener(e -> {
-            System.out.println("Feeding pet!");
+            stats.addHunger(20);
+            stats.addHappiness(5);
+            stats.addCoins(10);
+            SaveManager.save(stats);
+            System.out.println("Fed! Hunger: " + stats.hunger
+                    + ", Happiness: " + stats.happiness
+                    + ", Coins: " + stats.coins);
         });
 
+        // Play: boost happiness, costs energy, earn coins
         playButton.addActionListener(e -> {
-            System.out.println("Playing with pet!");
+            stats.addHappiness(20);
+            stats.addEnergy(-10);
+            stats.addCoins(15);
+            SaveManager.save(stats);
             String randomImage = getRandomGrassImage();
-            System.out.println("Opening: " + randomImage);
+            System.out.println("Playing! Happiness: " + stats.happiness
+                    + ", Energy: " + stats.energy
+                    + ", Coins: " + stats.coins);
             openURL(randomImage);
         });
 
+        // Sleep: restore energy
         sleepButton.addActionListener(e -> {
-            System.out.println("Pet is sleeping!");
+            stats.addEnergy(50);
+            SaveManager.save(stats);
+            System.out.println("Slept! Energy: " + stats.energy);
         });
 
         settingsButton.addActionListener(e -> {
             System.out.println("Opening settings!");
         });
 
-        hideButton.addActionListener(e -> {
-            hideToTray(parentWindow);
-        });
+        hideButton.addActionListener(e -> hideToTray(parentWindow));
 
+        // Exit: save first, then quit
         exitButton.addActionListener(e -> {
+            SaveManager.save(stats);
             if (systemTray != null && trayIcon != null) {
                 systemTray.remove(trayIcon);
             }
