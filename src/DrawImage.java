@@ -17,7 +17,7 @@ public class DrawImage extends JPanel {
     private JPanel menuPanel;
     private JButton menuToggleButton;
     private boolean menuVisible = false;
-    private JFrame parentFrame;
+    private Window parentWindow;
 
     // Grass images list
     private List<String> grassImages;
@@ -34,9 +34,11 @@ public class DrawImage extends JPanel {
     private static final int MENU_WIDTH = 150;
     private static final int BUTTON_SIZE = 30;
 
-    public DrawImage(JFrame frame) {
-        this.parentFrame = frame;
-        //setPreferredSize(new Dimension(PET_WIDTH, PET_HEIGHT));
+    // Track dragging state for button visibility
+    private boolean currentlyDragging = false;
+
+    public DrawImage(Window window) {
+        this.parentWindow = window;
         setLayout(null);
 
         try {
@@ -56,7 +58,6 @@ public class DrawImage extends JPanel {
         random = new Random();
         grassImages = new ArrayList<>();
 
-        // Grass and nature images
         grassImages.add("https://www.thisoldhouse.com/wp-content/uploads/2020/08/iStock_511747120-scaled.jpg");
         grassImages.add("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSw15kIqSjCMWOaDlOx-rG_3J1J7oXXIRZCoA&s");
         grassImages.add("https://media.istockphoto.com/id/161820827/photo/morning-dew-drops-on-green-leafs.jpg?s=612x612&w=0&k=20&c=qxLfhCiF7yuICQr_Nm9c1ORLl3HDaSk8_F-xs_P5S-w=");
@@ -171,13 +172,11 @@ public class DrawImage extends JPanel {
             System.out.println("Opening settings!");
         });
 
-        // Hide to tray button
         hideButton.addActionListener(e -> {
-            hideToTray(parentFrame);
+            hideToTray(parentWindow);
         });
 
         exitButton.addActionListener(e -> {
-            // Clean up tray icon before exit
             if (systemTray != null && trayIcon != null) {
                 systemTray.remove(trayIcon);
             }
@@ -245,27 +244,52 @@ public class DrawImage extends JPanel {
         return button;
     }
 
+    /**
+     * Helper to get the dialog cast from parentWindow
+     */
+    private JDialog getDialog() {
+        if (parentWindow instanceof JDialog) {
+            return (JDialog) parentWindow;
+        }
+        return null;
+    }
+
     public void toggleMenu() {
         menuVisible = !menuVisible;
+        JDialog dialog = getDialog();
+        if (dialog == null) return;
 
         if (menuVisible) {
             menuToggleButton.setText("✕");
-            parentFrame.setSize(PET_WIDTH + MENU_WIDTH, PET_HEIGHT);
-            parentFrame.setLocation(parentFrame.getX() - MENU_WIDTH, parentFrame.getY());
-            parentFrame.add(menuPanel, BorderLayout.WEST);
+            dialog.setSize(PET_WIDTH + MENU_WIDTH, PET_HEIGHT);
+            dialog.setLocation(dialog.getX() - MENU_WIDTH, dialog.getY());
+            dialog.add(menuPanel, BorderLayout.WEST);
         } else {
             menuToggleButton.setText("☰");
-            parentFrame.remove(menuPanel);
-            parentFrame.setSize(PET_WIDTH, PET_HEIGHT);
-            parentFrame.setLocation(parentFrame.getX() + MENU_WIDTH, parentFrame.getY());
+            dialog.remove(menuPanel);
+            dialog.setSize(PET_WIDTH, PET_HEIGHT);
+            dialog.setLocation(dialog.getX() + MENU_WIDTH, dialog.getY());
         }
 
-        parentFrame.revalidate();
-        parentFrame.repaint();
+        dialog.revalidate();
+        dialog.repaint();
     }
 
     public void setDragging(boolean isDragging) {
+        currentlyDragging = isDragging;
         currentImage = isDragging ? dragImage : normalImage;
+
+        // Hide menu button while dragging
+        if (isDragging) {
+            menuToggleButton.setVisible(false);
+            // Close menu if open when starting to drag
+            if (menuVisible) {
+                toggleMenu();
+            }
+        } else {
+            menuToggleButton.setVisible(true);
+        }
+
         repaint();
     }
 
@@ -277,20 +301,14 @@ public class DrawImage extends JPanel {
 
     // ==================== SYSTEM TRAY METHODS ====================
 
-    /**
-     * Load the application icon from file or create a default one
-     */
     private static Image loadAppIcon() {
         try {
-            // Try to load custom icon from file
-            // Place your icon file at "images/icon.png" (recommended size: 64x64 or 128x128)
             File iconFile = new File("images/icon.png");
             if (iconFile.exists()) {
                 return ImageIO.read(iconFile);
             }
 
-            // Alternative: try loading the cat image as icon
-            File catIcon = new File("images/catsitting.png");
+            File catIcon = new File("images/yarn_icon.png");
             if (catIcon.exists()) {
                 return ImageIO.read(catIcon);
             }
@@ -298,13 +316,9 @@ public class DrawImage extends JPanel {
             e.printStackTrace();
         }
 
-        // Create a default icon if no file found
         return createDefaultIcon();
     }
 
-    /**
-     * Creates a simple default cat icon programmatically
-     */
     private static Image createDefaultIcon() {
         int size = 64;
         BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
@@ -312,12 +326,9 @@ public class DrawImage extends JPanel {
 
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        // Draw a simple cat face
-        // Head
         g2d.setColor(new Color(255, 200, 100));
         g2d.fillOval(8, 16, 48, 44);
 
-        // Ears
         int[] earLeftX = {8, 16, 24};
         int[] earLeftY = {24, 4, 24};
         g2d.fillPolygon(earLeftX, earLeftY, 3);
@@ -326,7 +337,6 @@ public class DrawImage extends JPanel {
         int[] earRightY = {24, 4, 24};
         g2d.fillPolygon(earRightX, earRightY, 3);
 
-        // Inner ears
         g2d.setColor(new Color(255, 150, 150));
         int[] innerEarLeftX = {12, 16, 20};
         int[] innerEarLeftY = {22, 10, 22};
@@ -336,29 +346,24 @@ public class DrawImage extends JPanel {
         int[] innerEarRightY = {22, 10, 22};
         g2d.fillPolygon(innerEarRightX, innerEarRightY, 3);
 
-        // Eyes
         g2d.setColor(Color.BLACK);
         g2d.fillOval(20, 32, 8, 10);
         g2d.fillOval(36, 32, 8, 10);
 
-        // Eye shine
         g2d.setColor(Color.WHITE);
         g2d.fillOval(22, 34, 3, 3);
         g2d.fillOval(38, 34, 3, 3);
 
-        // Nose
         g2d.setColor(new Color(255, 150, 150));
         int[] noseX = {32, 28, 36};
         int[] noseY = {44, 50, 50};
         g2d.fillPolygon(noseX, noseY, 3);
 
-        // Mouth
         g2d.setColor(Color.BLACK);
         g2d.setStroke(new BasicStroke(1.5f));
         g2d.drawArc(24, 48, 8, 6, 0, -180);
         g2d.drawArc(32, 48, 8, 6, 0, -180);
 
-        // Whiskers
         g2d.drawLine(8, 44, 20, 46);
         g2d.drawLine(8, 48, 20, 48);
         g2d.drawLine(8, 52, 20, 50);
@@ -370,11 +375,7 @@ public class DrawImage extends JPanel {
         return image;
     }
 
-    /**
-     * Setup the system tray with icon and menu
-     */
-    private static void setupSystemTray(JFrame frame) {
-        // Check if system tray is supported
+    private static void setupSystemTray(Window window) {
         if (!SystemTray.isSupported()) {
             System.out.println("System tray is not supported on this system");
             return;
@@ -383,11 +384,9 @@ public class DrawImage extends JPanel {
         systemTray = SystemTray.getSystemTray();
         Image trayImage = loadAppIcon();
 
-        // Scale image for tray (usually 16x16 or 24x24 depending on OS)
         Dimension trayIconSize = systemTray.getTrayIconSize();
         trayImage = trayImage.getScaledInstance(trayIconSize.width, trayIconSize.height, Image.SCALE_SMOOTH);
 
-        // Create popup menu for tray
         PopupMenu popup = new PopupMenu();
 
         MenuItem showItem = new MenuItem("Show Pet");
@@ -396,36 +395,24 @@ public class DrawImage extends JPanel {
         MenuItem playItem = new MenuItem("Play");
         MenuItem exitItem = new MenuItem("Exit");
 
-        // Show pet
-        showItem.addActionListener(e -> {
-            showFromTray(frame);
-        });
+        showItem.addActionListener(e -> showFromTray(window));
+        hideItem.addActionListener(e -> hideToTray(window));
 
-        // Hide pet
-        hideItem.addActionListener(e -> {
-            hideToTray(frame);
-        });
-
-        // Feed action
         feedItem.addActionListener(e -> {
             System.out.println("Feeding pet from tray!");
-            // Show a notification
-            trayIcon.displayMessage("Pet Cat", "Yummy! Thanks for the food! 🍖", TrayIcon.MessageType.INFO);
+            trayIcon.displayMessage("Dingus", "Yummy! Thanks for the food!", TrayIcon.MessageType.INFO);
         });
 
-        // Play action
         playItem.addActionListener(e -> {
             System.out.println("Playing from tray!");
-            trayIcon.displayMessage("Pet Cat", "Let's play! 🎾", TrayIcon.MessageType.INFO);
+            trayIcon.displayMessage("Dingus", "Let's play!", TrayIcon.MessageType.INFO);
         });
 
-        // Exit application
         exitItem.addActionListener(e -> {
             systemTray.remove(trayIcon);
             System.exit(0);
         });
 
-        // Add items to popup menu
         popup.add(showItem);
         popup.add(hideItem);
         popup.addSeparator();
@@ -434,48 +421,46 @@ public class DrawImage extends JPanel {
         popup.addSeparator();
         popup.add(exitItem);
 
-        // Create tray icon
-        trayIcon = new TrayIcon(trayImage, "Pet Cat", popup);
+        trayIcon = new TrayIcon(trayImage, "Dingus", popup);
         trayIcon.setImageAutoSize(true);
 
-        // Double-click to show/hide
         trayIcon.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) {
                     if (isVisible) {
-                        hideToTray(frame);
+                        hideToTray(window);
                     } else {
-                        showFromTray(frame);
+                        showFromTray(window);
                     }
                 }
             }
         });
 
-
+        try {
+            systemTray.add(trayIcon);
+        } catch (AWTException e) {
+            System.err.println("Could not add tray icon: " + e.getMessage());
+        }
     }
 
-    /**
-     * Hide the frame and show only in system tray
-     */
-    private static void hideToTray(JFrame frame) {
-        frame.setVisible(false);
+    private static void hideToTray(Window window) {
+        window.setVisible(false);
         isVisible = false;
+        if (trayIcon != null) {
+            trayIcon.displayMessage("Dingus", "I'm hiding in the tray! Double-click to bring me back.", TrayIcon.MessageType.INFO);
+        }
     }
 
-    /**
-     * Show the frame from system tray
-     */
-    private static void showFromTray(JFrame frame) {
-        frame.setVisible(true);
-        frame.setAlwaysOnTop(true);
+    private static void showFromTray(Window window) {
+        window.setVisible(true);
+        window.setAlwaysOnTop(true);
         isVisible = true;
     }
 
     // ==================== MAIN METHOD ====================
 
     public static void main(String[] args) {
-        // Use system look and feel for better tray integration
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception e) {
@@ -483,24 +468,32 @@ public class DrawImage extends JPanel {
         }
 
         SwingUtilities.invokeLater(() -> {
-            JFrame frame = new JFrame("Cat");
-            frame.setUndecorated(true);
-            frame.setBackground(new Color(0, 0, 0, 0));
-            frame.setLayout(new BorderLayout());
+            // Hidden utility frame as owner - prevents taskbar entry
+            JFrame hiddenOwner = new JFrame();
+            hiddenOwner.setUndecorated(true);
+            hiddenOwner.setSize(0, 0);
+            hiddenOwner.setType(Window.Type.UTILITY);
+            hiddenOwner.setLocationRelativeTo(null);
+            hiddenOwner.setVisible(true);
 
-            // Set custom application icon (replaces Java coffee cup)
+            // JDialog owned by utility frame = no taskbar icon
+            JDialog dialog = new JDialog(hiddenOwner);
+            dialog.setUndecorated(true);
+            dialog.setBackground(new Color(0, 0, 0, 0));
+            dialog.setLayout(new BorderLayout());
+
+            // Set icon on the hidden owner
             Image appIcon = loadAppIcon();
-            frame.setIconImage(appIcon);
-
-            // Also set icon for all windows
+            hiddenOwner.setIconImage(appIcon);
             List<Image> icons = new ArrayList<>();
             icons.add(appIcon.getScaledInstance(16, 16, Image.SCALE_SMOOTH));
             icons.add(appIcon.getScaledInstance(32, 32, Image.SCALE_SMOOTH));
             icons.add(appIcon.getScaledInstance(64, 64, Image.SCALE_SMOOTH));
             icons.add(appIcon.getScaledInstance(128, 128, Image.SCALE_SMOOTH));
-            frame.setIconImages(icons);
+            hiddenOwner.setIconImages(icons);
 
-            DrawImage panel = new DrawImage(frame);
+            // Pass the dialog as the parent window
+            DrawImage panel = new DrawImage(dialog);
             panel.setOpaque(false);
 
             final Point[] clickOffset = {null};
@@ -509,7 +502,7 @@ public class DrawImage extends JPanel {
             panel.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
-                    if (isClickOnButton(e.getPoint())) {
+                    if (isClickOnButton(e.getPoint(), panel)) {
                         return;
                     }
                     clickOffset[0] = e.getPoint();
@@ -525,8 +518,10 @@ public class DrawImage extends JPanel {
                     }
                 }
 
-                private boolean isClickOnButton(Point p) {
-                    return p.x >= 5 && p.x <= 35 && p.y >= 5 && p.y <= 35;
+                private boolean isClickOnButton(Point p, DrawImage panel) {
+                    if (!panel.menuToggleButton.isVisible()) return false;
+                    return p.x >= 5 && p.x <= 5 + BUTTON_SIZE
+                            && p.y >= 5 && p.y <= 5 + BUTTON_SIZE;
                 }
             });
 
@@ -534,36 +529,31 @@ public class DrawImage extends JPanel {
                 @Override
                 public void mouseDragged(MouseEvent e) {
                     if (isDragging[0] && clickOffset[0] != null) {
-                        Point frameLocation = frame.getLocation();
-                        frame.setLocation(
-                                frameLocation.x + e.getX() - clickOffset[0].x,
-                                frameLocation.y + e.getY() - clickOffset[0].y
+                        Point loc = dialog.getLocation();
+                        dialog.setLocation(
+                                loc.x + e.getX() - clickOffset[0].x,
+                                loc.y + e.getY() - clickOffset[0].y
                         );
                     }
                 }
             });
 
-            frame.add(panel, BorderLayout.CENTER);
-            frame.setSize(360, 270);
+            dialog.add(panel, BorderLayout.CENTER);
+            dialog.setSize(PET_WIDTH, PET_HEIGHT);
 
             Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-            frame.setLocation(screenSize.width - frame.getWidth(), screenSize.height - frame.getHeight() - 45);
+            dialog.setLocation(
+                    screenSize.width - dialog.getWidth(),
+                    screenSize.height - dialog.getHeight() - 45
+            );
 
-            // Don't exit on close - minimize to tray instead
-            frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-            frame.addWindowListener(new WindowAdapter() {
-                @Override
-                public void windowClosing(WindowEvent e) {
-                    hideToTray(frame);
-                }
-            });
+            dialog.setAlwaysOnTop(true);
+            dialog.setResizable(false);
 
-            // Setup system tray
-            setupSystemTray(frame);
+            // Setup system tray with the dialog
+            setupSystemTray(dialog);
 
-            frame.setVisible(true);
-            frame.setResizable(false);
-            frame.setAlwaysOnTop(true);
+            dialog.setVisible(true);
         });
     }
 }
