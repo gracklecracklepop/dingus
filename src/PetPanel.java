@@ -9,8 +9,9 @@ public class PetPanel extends JPanel {
 
     private static final int BUTTON_SIZE = 30;
 
-    private final BufferedImage normalImage;
-    private final BufferedImage dragImage;
+    private final BufferedImage normalImage;   // catsitting.png  — on desktop
+    private final BufferedImage dragImage;     // catscruff.jpg   — being dragged
+    private final BufferedImage bedImage;      // catinbed.png    — resting in bed
     private BufferedImage currentImage;
 
     private final JButton menuToggleButton;
@@ -18,6 +19,7 @@ public class PetPanel extends JPanel {
     private boolean menuVisible = false;
 
     private final JDialog dialog;
+    private BedDialog bed; // set after construction via setBedDialog()
 
     Toolkit toolkit = Toolkit.getDefaultToolkit();
     Dimension screenSize = toolkit.getScreenSize();
@@ -28,6 +30,7 @@ public class PetPanel extends JPanel {
 
         normalImage  = loadImage("images/catsitting.png");
         dragImage    = loadImage("images/catscruff.jpg");
+        bedImage     = loadImage("images/catinbed.jpg");
         currentImage = normalImage;
 
         PetStats stats = SaveManager.load();
@@ -40,10 +43,21 @@ public class PetPanel extends JPanel {
 
     // ── Public API ──────────────────────────────────────────────
 
+    /** Called from Main after BedDialog is constructed. */
+    public void setBedDialog(BedDialog bed) {
+        this.bed = bed;
+    }
+
     public void setDragging(boolean dragging) {
-        currentImage = dragging ? dragImage : normalImage;
-        menuToggleButton.setVisible(!dragging);
-        if (dragging && menuVisible) toggleMenu();
+        if (dragging) {
+            currentImage = dragImage;
+            menuToggleButton.setVisible(false);
+            if (menuVisible) toggleMenu();
+        } else {
+            // Released — check whether we landed on the bed
+            currentImage = isOverBed() ? bedImage : normalImage;
+            menuToggleButton.setVisible(true);
+        }
         repaint();
     }
 
@@ -51,6 +65,20 @@ public class PetPanel extends JPanel {
         if (!menuToggleButton.isVisible()) return false;
         return p.x >= 5 && p.x <= 5 + BUTTON_SIZE
                 && p.y >= 5 && p.y <= 5 + BUTTON_SIZE;
+    }
+
+    // ── Bed overlap detection ────────────────────────────────────
+
+    /**
+     * Returns true when the pet dialog's bounds intersect the bed dialog's bounds.
+     * Uses screen coordinates so the comparison is always accurate regardless of
+     * where either window happens to be.
+     */
+    private boolean isOverBed() {
+        if (bed == null) return false;
+        Rectangle petBounds = dialog.getBounds();
+        Rectangle bedBounds = bed.getBounds();
+        return petBounds.intersects(bedBounds);
     }
 
     // ── Private helpers ──────────────────────────────────────────
@@ -79,7 +107,7 @@ public class PetPanel extends JPanel {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 Color bg = getModel().isPressed()  ? new Color(60,60,60,220)
                         : getModel().isRollover() ? new Color(80,80,80,220)
-                        : new Color(50,50,50,200);
+                        :                           new Color(50,50,50,200);
                 g2.setColor(bg);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
                 g2.setColor(new Color(100,100,100));
@@ -112,7 +140,9 @@ public class PetPanel extends JPanel {
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        System.out.println(screenSize.getHeight());
-        if (currentImage != null) g.drawImage(currentImage, 0, 0,  (int)(screenSize.getWidth() / 4), (int)(screenSize.getHeight() / 4), this);
+        if (currentImage != null)
+            g.drawImage(currentImage, 0, 0,
+                    (int)(screenSize.getWidth()  / 4),
+                    (int)(screenSize.getHeight() / 4), this);
     }
 }

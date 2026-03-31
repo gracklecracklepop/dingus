@@ -55,9 +55,9 @@ public class PetMenu {
         p.add(title);
         p.add(Box.createVerticalStrut(10));
 
-        addButton(p, "🍖 Feed",      () -> { stats.addHunger(20);  stats.addHappiness(5);  stats.addCoins(10);  save(); });
-        addButton(p, "🎾 Play",      () -> { stats.addHappiness(20); stats.addEnergy(-10); stats.addCoins(15); save(); openRandomGrass(); });
-        addButton(p, "😴 Sleep",     () -> { stats.addEnergy(50);   save(); });
+        addButton(p, "🍖 Feed",  () -> { stats.addHunger(20);    stats.addHappiness(5);  stats.addCoins(10);  stats.printStats(); save(); });
+        addButton(p, "🎾 Play",  () -> { stats.addHappiness(20); stats.addEnergy(-10);   stats.addCoins(15);  stats.printStats(); save(); openRandomGrass(); });
+        addButton(p, "😴 Sleep", () -> { stats.addEnergy(50);                                                  stats.printStats(); save(); });
         addButton(p, "⚙️ Settings",  () -> System.out.println("Opening settings!"));
         addButton(p, "👁 Hide",      () -> PetTray.hide(dialog));
         addButton(p, "❌ Exit",      () -> { save(); PetTray.remove(); System.exit(0); });

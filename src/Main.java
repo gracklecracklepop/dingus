@@ -51,6 +51,10 @@ public class Main {
 
             PetPanel panel = new PetPanel(dialog);
             panel.setOpaque(false);
+
+            // Give PetPanel a reference to BedDialog so it can do overlap detection
+            panel.setBedDialog(bed);
+
             dialog.add(panel, BorderLayout.CENTER);
 
             PetTray.setup(dialog, bed, icon);
@@ -62,8 +66,8 @@ public class Main {
     }
 
     private static void attachDragListener(PetPanel panel, JDialog dialog) {
-        final Point[] offset    = {null};
-        final boolean[] active  = {false};
+        final Point[] offset   = {null};
+        final boolean[] active = {false};
 
         panel.addMouseListener(new MouseAdapter() {
             @Override public void mousePressed(MouseEvent e) {
@@ -75,7 +79,7 @@ public class Main {
             @Override public void mouseReleased(MouseEvent e) {
                 if (!active[0]) return;
                 active[0] = false;
-                panel.setDragging(false);
+                panel.setDragging(false); // triggers bed check inside PetPanel
             }
         });
 
