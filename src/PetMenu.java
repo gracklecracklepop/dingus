@@ -9,7 +9,12 @@ public class PetMenu {
     private final JPanel panel;
     private final PetStats stats;
 
-    // Grass images for the Play button
+    private CardLayout cardLayout;
+    private JPanel container;
+
+    // Keep reference to stats panel for rebuilding
+    private JPanel statsPanel;
+
     private static final String[] GRASS_URLS = {
             "https://www.thisoldhouse.com/wp-content/uploads/2020/08/iStock_511747120-scaled.jpg",
             "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSw15kIqSjCMWOaDlOx-rG_3J1J7oXXIRZCoA&s",
@@ -27,14 +32,118 @@ public class PetMenu {
 
     public PetMenu(PetStats stats, JDialog dialog) {
         this.stats = stats;
-        this.panel = buildPanel(dialog);
+
+        cardLayout = new CardLayout();
+        container = new JPanel(cardLayout);
+        container.setOpaque(false);
+
+        container.add(buildMainMenu(dialog), "menu");
+
+        // Build initial stats panel
+        statsPanel = buildStatsMenu();
+        container.add(statsPanel, "stats");
+
+        this.panel = container;
     }
 
     public JPanel getPanel() { return panel; }
 
-    // ── Panel construction ───────────────────────────────────────
+    // ── Main Menu ───────────────────────────────────────────────
 
-    private JPanel buildPanel(JDialog dialog) {
+    private JPanel buildMainMenu(JDialog dialog) {
+        JPanel p = createBasePanel();
+
+        JLabel title = new JLabel("🐱 Menu");
+        styleTitle(title);
+        p.add(title);
+        p.add(Box.createVerticalStrut(10));
+
+        addButton(p, "🍖 Feed",  () -> {
+            stats.addHunger(20);
+            stats.addHappiness(5);
+            stats.addCoins(10);
+            stats.printStats();
+            save();
+        });
+
+        addButton(p, "🎾 Play",  () -> {
+            stats.addHappiness(20);
+            stats.addEnergy(-10);
+            stats.addCoins(15);
+            stats.printStats();
+            save();
+            openRandomGrass();
+        });
+
+        addButton(p, "😴 Sleep", () -> {
+            stats.addEnergy(50);
+            stats.printStats();
+            save();
+        });
+
+        addButton(p, "⚙️ Settings", () -> System.out.println("Opening settings!"));
+
+        // SWITCH TO STATS VIEW - rebuild panel to show current values
+        addButton(p, "📊 Stats", () -> showStats());
+
+        addButton(p, "👁 Hide", () -> PetTray.hide(dialog));
+        addButton(p, "❌ Exit", () -> { save(); PetTray.remove(); System.exit(0); });
+
+        return p;
+    }
+
+    /**
+     * Rebuild stats panel with current values and show it
+     */
+    private void showStats() {
+        // Remove old stats panel
+        container.remove(statsPanel);
+
+        // Rebuild with current values
+        statsPanel = buildStatsMenu();
+        container.add(statsPanel, "stats");
+
+        // Show it
+        cardLayout.show(container, "stats");
+        container.revalidate();
+        container.repaint();
+    }
+
+    // ── Stats Menu (reads current values from stats object) ─────
+
+    private JPanel buildStatsMenu() {
+        JPanel p = createBasePanel();
+
+        JLabel title = new JLabel("📊 Stats");
+        styleTitle(title);
+        p.add(title);
+        p.add(Box.createVerticalStrut(10));
+
+        // These now read CURRENT values from stats object
+        p.add(makeBar("Hunger", stats.getHunger()));
+        p.add(Box.createVerticalStrut(8));
+        p.add(makeBar("Happiness", stats.getHappiness()));
+        p.add(Box.createVerticalStrut(8));
+        p.add(makeBar("Energy", stats.getEnergy()));
+        p.add(Box.createVerticalStrut(10));
+
+        JLabel coins = new JLabel("🪙 Coins: " + stats.getCoins());
+        coins.setForeground(new Color(255, 215, 0)); // Gold color
+        coins.setFont(new Font("Arial", Font.BOLD, 12));
+        coins.setAlignmentX(Component.CENTER_ALIGNMENT);
+        p.add(coins);
+
+        p.add(Box.createVerticalStrut(10));
+
+        // BACK BUTTON
+        addButton(p, "⬅ Back", () -> cardLayout.show(container, "menu"));
+
+        return p;
+    }
+
+    // ── Shared UI Styling ───────────────────────────────────────
+
+    private JPanel createBasePanel() {
         JPanel p = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -47,22 +156,13 @@ public class PetMenu {
         p.setOpaque(false);
         p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
         p.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        return p;
+    }
 
-        JLabel title = new JLabel("🐱 Menu");
+    private void styleTitle(JLabel title) {
         title.setForeground(Color.WHITE);
         title.setFont(new Font("Arial", Font.BOLD, 14));
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
-        p.add(title);
-        p.add(Box.createVerticalStrut(10));
-
-        addButton(p, "🍖 Feed",  () -> { stats.addHunger(20);    stats.addHappiness(5);  stats.addCoins(10);  stats.printStats(); save(); });
-        addButton(p, "🎾 Play",  () -> { stats.addHappiness(20); stats.addEnergy(-10);   stats.addCoins(15);  stats.printStats(); save(); openRandomGrass(); });
-        addButton(p, "😴 Sleep", () -> { stats.addEnergy(50);                                                  stats.printStats(); save(); });
-        addButton(p, "⚙️ Settings",  () -> System.out.println("Opening settings!"));
-        addButton(p, "👁 Hide",      () -> PetTray.hide(dialog));
-        addButton(p, "❌ Exit",      () -> { save(); PetTray.remove(); System.exit(0); });
-
-        return p;
     }
 
     private void addButton(JPanel parent, String label, Runnable action) {
@@ -102,13 +202,48 @@ public class PetMenu {
         return btn;
     }
 
+    private JPanel makeBar(String label, int value) {
+        JPanel p = new JPanel();
+        p.setLayout(new BorderLayout());
+        p.setOpaque(false);
+        p.setMaximumSize(new Dimension(WIDTH - 30, 40));
+
+        JLabel l = new JLabel(label + ": " + value + "%");
+        l.setForeground(Color.WHITE);
+        l.setFont(new Font("Arial", Font.PLAIN, 11));
+
+        JProgressBar bar = new JProgressBar(0, 100);
+        bar.setValue(Math.max(0, Math.min(100, value))); // Clamp 0-100
+        bar.setStringPainted(false);
+
+        // Color based on value
+        if (value >= 70) {
+            bar.setForeground(new Color(100, 200, 100)); // Green
+        } else if (value >= 30) {
+            bar.setForeground(new Color(255, 200, 50));  // Yellow
+        } else {
+            bar.setForeground(new Color(255, 80, 80));   // Red
+        }
+        bar.setBackground(new Color(60, 60, 60));
+
+        p.add(l, BorderLayout.NORTH);
+        p.add(bar, BorderLayout.CENTER);
+
+        return p;
+    }
+
     // ── Helpers ──────────────────────────────────────────────────
 
-    private void save() { SaveManager.save(stats); }
+    private void save() {
+        SaveManager.save(stats);
+    }
 
     private void openRandomGrass() {
         String url = GRASS_URLS[(int)(Math.random() * GRASS_URLS.length)];
-        try { Desktop.getDesktop().browse(new java.net.URI(url)); }
-        catch (Exception e) { e.printStackTrace(); }
+        try {
+            Desktop.getDesktop().browse(new java.net.URI(url));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
