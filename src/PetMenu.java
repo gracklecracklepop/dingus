@@ -1,6 +1,7 @@
 import javax.swing.*;
 import java.awt.*;
 import java.awt.Desktop;
+import java.io.File;
 
 public class PetMenu {
 
@@ -11,9 +12,11 @@ public class PetMenu {
 
     private CardLayout cardLayout;
     private JPanel container;
-
-    // Keep reference to stats panel for rebuilding
     private JPanel statsPanel;
+
+    // Live bar references for main menu only
+    private JProgressBar hungerBar, happinessBar, energyBar;
+    private JLabel hungerLabel, happinessLabel, energyLabel;
 
     private static final String[] GRASS_URLS = {
             "https://www.thisoldhouse.com/wp-content/uploads/2020/08/iStock_511747120-scaled.jpg",
@@ -39,7 +42,6 @@ public class PetMenu {
 
         container.add(buildMainMenu(dialog), "menu");
 
-        // Build initial stats panel
         statsPanel = buildStatsMenu();
         container.add(statsPanel, "stats");
 
@@ -56,60 +58,79 @@ public class PetMenu {
         JLabel title = new JLabel("🐱 Menu");
         styleTitle(title);
         p.add(title);
-        p.add(Box.createVerticalStrut(10));
+        p.add(Box.createVerticalStrut(20));
 
-        addButton(p, "🍖 Feed",  () -> {
+        // Create bars explicitly so field references are unambiguous
+        hungerLabel    = styledLabel("Hunger: "    + stats.getHunger()    + "%");
+        happinessLabel = styledLabel("Happiness: " + stats.getHappiness() + "%");
+        energyLabel    = styledLabel("Energy: "    + stats.getEnergy()    + "%");
+
+        hungerBar    = makeProgressBar(stats.getHunger());
+        happinessBar = makeProgressBar(stats.getHappiness());
+        energyBar    = makeProgressBar(stats.getEnergy());
+
+        p.add(wrapBar(hungerLabel,    hungerBar));    p.add(Box.createVerticalStrut(8));
+        p.add(wrapBar(happinessLabel, happinessBar)); p.add(Box.createVerticalStrut(8));
+        p.add(wrapBar(energyLabel,    energyBar));    p.add(Box.createVerticalStrut(8));
+
+        addButton(p, "🍖 Feed", () -> {
             stats.addHunger(20);
             stats.addHappiness(5);
             stats.addCoins(10);
+            updateBar(hungerBar,    hungerLabel,    "Hunger",    stats.getHunger());
+            updateBar(happinessBar, happinessLabel, "Happiness", stats.getHappiness());
             stats.printStats();
             save();
         });
 
-        addButton(p, "🎾 Play",  () -> {
+        addButton(p, "🎾 Play", () -> {
             stats.addHappiness(20);
             stats.addEnergy(-10);
+            stats.addHunger(-10);
             stats.addCoins(15);
+            updateBar(happinessBar, happinessLabel, "Happiness", stats.getHappiness());
+            updateBar(energyBar,    energyLabel,    "Energy",    stats.getEnergy());
             stats.printStats();
             save();
             openRandomGrass();
         });
 
         addButton(p, "😴 Sleep", () -> {
-            stats.addEnergy(50);
+            stats.addEnergy(10);
+            updateBar(energyBar, energyLabel, "Energy", stats.getEnergy());
             stats.printStats();
             save();
         });
 
         addButton(p, "⚙️ Settings", () -> System.out.println("Opening settings!"));
-
-        // SWITCH TO STATS VIEW - rebuild panel to show current values
-        addButton(p, "📊 Stats", () -> showStats());
-
-        addButton(p, "👁 Hide", () -> PetTray.hide(dialog));
-        addButton(p, "❌ Exit", () -> { save(); PetTray.remove(); System.exit(0); });
+        addButton(p, "👁 Hide",     () -> PetTray.hide(dialog));
+        addButton(p, "❌ Exit",     () -> { save(); PetTray.remove(); System.exit(0); });
 
         return p;
     }
 
-    /**
-     * Rebuild stats panel with current values and show it
-     */
-    private void showStats() {
-        // Remove old stats panel
-        container.remove(statsPanel);
+    // ── Update a live bar in-place ───────────────────────────────
 
-        // Rebuild with current values
+    private void updateBar(JProgressBar bar, JLabel label, String name, int value) {
+        bar.setValue(value);
+        label.setText(name + ": " + value + "%");
+        if (value >= 70)      bar.setForeground(new Color(100, 200, 100));
+        else if (value >= 30) bar.setForeground(new Color(255, 200, 50));
+        else                  bar.setForeground(new Color(255, 80, 80));
+        bar.repaint();
+        label.repaint();
+    }
+
+    // ── Stats Menu ───────────────────────────────────────────────
+
+    private void showStats() {
+        container.remove(statsPanel);
         statsPanel = buildStatsMenu();
         container.add(statsPanel, "stats");
-
-        // Show it
         cardLayout.show(container, "stats");
         container.revalidate();
         container.repaint();
     }
-
-    // ── Stats Menu (reads current values from stats object) ─────
 
     private JPanel buildStatsMenu() {
         JPanel p = createBasePanel();
@@ -119,29 +140,24 @@ public class PetMenu {
         p.add(title);
         p.add(Box.createVerticalStrut(10));
 
-        // These now read CURRENT values from stats object
-        p.add(makeBar("Hunger", stats.getHunger()));
-        p.add(Box.createVerticalStrut(8));
-        p.add(makeBar("Happiness", stats.getHappiness()));
-        p.add(Box.createVerticalStrut(8));
-        p.add(makeBar("Energy", stats.getEnergy()));
-        p.add(Box.createVerticalStrut(10));
+        p.add(makeBar("Hunger",    stats.getHunger()));    p.add(Box.createVerticalStrut(8));
+        p.add(makeBar("Happiness", stats.getHappiness())); p.add(Box.createVerticalStrut(8));
+        p.add(makeBar("Energy",    stats.getEnergy()));    p.add(Box.createVerticalStrut(10));
 
         JLabel coins = new JLabel("🪙 Coins: " + stats.getCoins());
-        coins.setForeground(new Color(255, 215, 0)); // Gold color
-        coins.setFont(new Font("Arial", Font.BOLD, 12));
+        coins.setForeground(new Color(255, 215, 0));
+        final Font CUSTOM_FONT = loadFont(10);
+        coins.setFont(CUSTOM_FONT);
         coins.setAlignmentX(Component.CENTER_ALIGNMENT);
         p.add(coins);
-
         p.add(Box.createVerticalStrut(10));
 
-        // BACK BUTTON
         addButton(p, "⬅ Back", () -> cardLayout.show(container, "menu"));
 
         return p;
     }
 
-    // ── Shared UI Styling ───────────────────────────────────────
+    // ── Shared UI ────────────────────────────────────────────────
 
     private JPanel createBasePanel() {
         JPanel p = new JPanel() {
@@ -161,8 +177,44 @@ public class PetMenu {
 
     private void styleTitle(JLabel title) {
         title.setForeground(Color.WHITE);
-        title.setFont(new Font("Arial", Font.BOLD, 14));
+        final Font CUSTOM_FONT = loadFont(17);
+        title.setFont(CUSTOM_FONT);
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
+    }
+
+    private JLabel styledLabel(String text) {
+        JLabel l = new JLabel(text);
+        l.setForeground(Color.WHITE);
+        final Font CUSTOM_FONT = loadFont(12);
+
+        l.setFont(CUSTOM_FONT);
+        return l;
+    }
+
+    private JProgressBar makeProgressBar(int value) {
+        JProgressBar bar = new JProgressBar(0, 100);
+        bar.setValue(Math.max(0, Math.min(100, value)));
+        bar.setStringPainted(false);
+        bar.setBackground(new Color(60, 60, 60));
+        if (value >= 70)      bar.setForeground(new Color(100, 200, 100));
+        else if (value >= 30) bar.setForeground(new Color(255, 200, 50));
+        else                  bar.setForeground(new Color(255, 80, 80));
+        return bar;
+    }
+
+    private JPanel wrapBar(JLabel label, JProgressBar bar) {
+        JPanel p = new JPanel(new BorderLayout());
+        p.setOpaque(false);
+        p.setMaximumSize(new Dimension(WIDTH - 30, 40));
+        p.add(label, BorderLayout.NORTH);
+        p.add(bar,   BorderLayout.CENTER);
+        return p;
+    }
+
+    // Used only by stats menu — no field side-effects
+    private JPanel makeBar(String label, int value) {
+        JLabel l = styledLabel(label + ": " + value + "%");
+        return wrapBar(l, makeProgressBar(value));
     }
 
     private void addButton(JPanel parent, String label, Runnable action) {
@@ -179,9 +231,10 @@ public class PetMenu {
                         : getModel().isRollover() ? new Color(100,100,100)
                         : new Color(60,60,60);
                 g2.setColor(bg);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 7, 8);
                 g2.setColor(Color.WHITE);
-                g2.setFont(getFont());
+                final Font CUSTOM_FONT = loadFont(12);
+                g2.setFont(CUSTOM_FONT);
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(getText(),
                         (getWidth()  - fm.stringWidth(getText())) / 2,
@@ -189,7 +242,11 @@ public class PetMenu {
                 g2.dispose();
             }
         };
-        btn.setFont(new Font("Arial", Font.PLAIN, 12));
+
+        // Load once (e.g. as a static field)
+        final Font CUSTOM_FONT = loadFont(17);
+
+        btn.setFont(CUSTOM_FONT);
         btn.setForeground(Color.WHITE);
         btn.setPreferredSize(new Dimension(WIDTH - 30, 30));
         btn.setMaximumSize(new Dimension(WIDTH - 30, 30));
@@ -202,48 +259,25 @@ public class PetMenu {
         return btn;
     }
 
-    private JPanel makeBar(String label, int value) {
-        JPanel p = new JPanel();
-        p.setLayout(new BorderLayout());
-        p.setOpaque(false);
-        p.setMaximumSize(new Dimension(WIDTH - 30, 40));
 
-        JLabel l = new JLabel(label + ": " + value + "%");
-        l.setForeground(Color.WHITE);
-        l.setFont(new Font("Arial", Font.PLAIN, 11));
-
-        JProgressBar bar = new JProgressBar(0, 100);
-        bar.setValue(Math.max(0, Math.min(100, value))); // Clamp 0-100
-        bar.setStringPainted(false);
-
-        // Color based on value
-        if (value >= 70) {
-            bar.setForeground(new Color(100, 200, 100)); // Green
-        } else if (value >= 30) {
-            bar.setForeground(new Color(255, 200, 50));  // Yellow
-        } else {
-            bar.setForeground(new Color(255, 80, 80));   // Red
+    private static Font loadFont(int fontSize) {
+        try {
+            Font font = Font.createFont(Font.TRUETYPE_FONT, new File("images/Shape Bit.otf"));
+            GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font);
+            return font.deriveFont(Font.PLAIN, fontSize);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new Font("Arial", Font.PLAIN, fontSize); // fallback
         }
-        bar.setBackground(new Color(60, 60, 60));
-
-        p.add(l, BorderLayout.NORTH);
-        p.add(bar, BorderLayout.CENTER);
-
-        return p;
     }
 
     // ── Helpers ──────────────────────────────────────────────────
 
-    private void save() {
-        SaveManager.save(stats);
-    }
+    private void save() { SaveManager.save(stats); }
 
     private void openRandomGrass() {
         String url = GRASS_URLS[(int)(Math.random() * GRASS_URLS.length)];
-        try {
-            Desktop.getDesktop().browse(new java.net.URI(url));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        try { Desktop.getDesktop().browse(new java.net.URI(url)); }
+        catch (Exception e) { e.printStackTrace(); }
     }
 }

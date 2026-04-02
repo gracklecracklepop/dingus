@@ -1,7 +1,8 @@
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class StoreItem {
+public class
+StoreItem {
     public String id;
     public String name;
     public int price;
