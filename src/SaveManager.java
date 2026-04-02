@@ -12,7 +12,6 @@ public class SaveManager {
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT);
-
     // Saves to ~/.dingus/save_data.json so it survives across runs
     private static final Path SAVE_DIR  = Paths.get(System.getProperty("user.home"), ".dingus");
     private static final Path SAVE_FILE = SAVE_DIR.resolve("save_data.json");
@@ -34,9 +33,13 @@ public class SaveManager {
 
     public static PetStats load() {
         File f = SAVE_FILE.toFile();
+        PetStats staty = new PetStats();
         if (!f.exists()) {
             System.out.println("No save file found — starting fresh.");
-            return new PetStats();
+            measuring.test();
+            while(!measuring.done){
+            }
+            return staty;
         }
         try {
             return MAPPER.readValue(f, PetStats.class);
