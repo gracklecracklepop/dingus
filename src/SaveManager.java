@@ -1,4 +1,3 @@
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import java.io.File;
@@ -9,17 +8,14 @@ import java.nio.file.Paths;
 
 public class SaveManager {
 
-
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT);
-    // Saves to ~/.dingus/save_data.json so it survives across runs
     private static final Path SAVE_DIR  = Paths.get(System.getProperty("user.home"), ".dingus");
     private static final Path SAVE_FILE = SAVE_DIR.resolve("save_data.json");
 
     public static boolean saveExists() {
         return SAVE_FILE.toFile().exists();
     }
-
 
     public static void save(PetStats stats) {
         try {
@@ -33,13 +29,8 @@ public class SaveManager {
 
     public static PetStats load() {
         File f = SAVE_FILE.toFile();
-        PetStats staty = new PetStats();
         if (!f.exists()) {
-            System.out.println("No save file found — starting fresh.");
-            measuring.test();
-            while(!measuring.done){
-            }
-            return staty;
+            return new PetStats(); // Fallback in case of emergency
         }
         try {
             return MAPPER.readValue(f, PetStats.class);
@@ -48,5 +39,4 @@ public class SaveManager {
             return new PetStats();
         }
     }
-    public boolean isReturningPet = SaveManager.saveExists();
 }

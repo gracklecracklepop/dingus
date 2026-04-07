@@ -76,7 +76,7 @@ public class PetMenu {
         addButton(p, "🍖 Feed", () -> {
             stats.addHunger(20);
             stats.addHappiness(5);
-            stats.addCoins(10);
+            stats.addCoins(5);
             updateBar(hungerBar,    hungerLabel,    "Hunger",    stats.getHunger());
             updateBar(happinessBar, happinessLabel, "Happiness", stats.getHappiness());
             stats.printStats();
@@ -87,7 +87,7 @@ public class PetMenu {
             stats.addHappiness(20);
             stats.addEnergy(-10);
             stats.addHunger(-10);
-            stats.addCoins(15);
+            stats.addCoins(5);
             updateBar(happinessBar, happinessLabel, "Happiness", stats.getHappiness());
             updateBar(energyBar,    energyLabel,    "Energy",    stats.getEnergy());
             stats.printStats();

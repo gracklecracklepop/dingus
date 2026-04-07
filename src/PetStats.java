@@ -12,7 +12,26 @@ public class PetStats {
     public int getEnergy() { return energy; }
     public int getCoins() { return coins; }
 
+    // --- NEW WIZARD VARIABLES ---
+    private String name = "Dingus";
+    private String gender = "Robot";
+    private String spriteColor = "Default (Orange)";
+    private long baseRam = 0;
 
+    // Jackson requires empty constructor
+    // --- Add Standard Getters & Setters for everything ---
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    public String getGender() { return gender; }
+    public void setGender(String gender) { this.gender = gender; }
+
+    public String getSpriteColor() { return spriteColor; }
+    public void setSpriteColor(String spriteColor) { this.spriteColor = spriteColor; }
+
+    public long getBaseRam() { return baseRam; }
+    public void setBaseRam(long baseRam) { this.baseRam = baseRam; }
     public void setHunger(int hunger) { this.hunger = clamp(hunger); }
     public void setHappiness(int happiness) { this.happiness = clamp(happiness); }
     public void setEnergy(int energy) { this.energy = clamp(energy); }
