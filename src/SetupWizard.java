@@ -12,6 +12,12 @@ public class SetupWizard extends JDialog {
     private CardLayout cardLayout = new CardLayout();
     private JPanel container = new JPanel(cardLayout);
 
+    // RAM UI components declared here so they can be updated when the test actually starts
+    private JLabel ramTitle;
+    private JLabel ramLiveStats;
+    private JProgressBar ramProgressBar;
+    private JButton ramNextBtn;
+
     public SetupWizard() {
         setTitle("✨ First Time Setup");
         setModal(true); // Blocks the rest of the app until finished
@@ -20,10 +26,15 @@ public class SetupWizard extends JDialog {
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setResizable(false);
 
+        // Add the three steps in order
+        container.add(buildIntroCard(), "intro");
         container.add(buildRamCheckCard(), "ram");
         container.add(buildCustomizationCard(), "custom");
 
         add(container);
+
+        // Start on the intro screen
+        cardLayout.show(container, "intro");
     }
 
     public boolean isFinished() {
@@ -34,38 +45,84 @@ public class SetupWizard extends JDialog {
         return newStats;
     }
 
+    // --- STEP 1: The Intro / Warning Prompt ---
+    private JPanel buildIntroCard() {
+        JPanel p = new JPanel(new BorderLayout(10, 20));
+        p.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+
+        JLabel title = new JLabel("Welcome!", SwingConstants.CENTER);
+        title.setFont(new Font("SansSerif", Font.BOLD, 22));
+
+        JTextArea instructions = new JTextArea(
+                "Before we create your pet, we need to measure your PC's baseline RAM usage so your pet knows when it's taking up too much space!\n\n" +
+                        "To get an accurate measurement:\n" +
+                        "1. Close all browsers, games, and heavy background apps.\n" +
+                        "2. Let your PC sit at the desktop for a moment.\n\n" +
+                        "When you're ready, click Start to begin the 15-second scan."
+        );
+        instructions.setWrapStyleWord(true);
+        instructions.setLineWrap(true);
+        instructions.setOpaque(false);
+        instructions.setEditable(false);
+        instructions.setFocusable(false);
+        instructions.setFont(new Font("SansSerif", Font.PLAIN, 13));
+
+        JButton startBtn = new JButton("I'm Ready - Start Scan");
+        startBtn.setFont(new Font("SansSerif", Font.BOLD, 14));
+        startBtn.setBackground(new Color(100, 150, 255));
+        startBtn.setForeground(Color.WHITE);
+        startBtn.setFocusPainted(false);
+        startBtn.setPreferredSize(new Dimension(200, 40));
+
+        startBtn.addActionListener(e -> {
+            cardLayout.show(container, "ram");
+            runRamTest(); // Execute the RAM test ONLY after clicking this button
+        });
+
+        p.add(title, BorderLayout.NORTH);
+        p.add(instructions, BorderLayout.CENTER);
+        p.add(startBtn, BorderLayout.SOUTH);
+
+        return p;
+    }
+
+    // --- STEP 2: The RAM Scan Screen ---
     private JPanel buildRamCheckCard() {
         JPanel p = new JPanel(new BorderLayout(10, 20));
         p.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
 
-        JLabel title = new JLabel("Establishing System RAM Baseline...", SwingConstants.CENTER);
-        title.setFont(new Font("SansSerif", Font.BOLD, 16));
+        ramTitle = new JLabel("Establishing System RAM Baseline...", SwingConstants.CENTER);
+        ramTitle.setFont(new Font("SansSerif", Font.BOLD, 16));
 
-        // Live stats label for the "hacker" feel
-        JLabel liveStats = new JLabel("Preparing to measure...", SwingConstants.CENTER);
-        liveStats.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        ramLiveStats = new JLabel("Initializing scanner...", SwingConstants.CENTER);
+        ramLiveStats.setFont(new Font("Monospaced", Font.PLAIN, 12));
 
         JPanel centerPanel = new JPanel(new GridLayout(2, 1, 0, 10));
-        JProgressBar progressBar = new JProgressBar(0, 100);
-        progressBar.setStringPainted(true);
+        ramProgressBar = new JProgressBar(0, 100);
+        ramProgressBar.setStringPainted(true);
 
-        centerPanel.add(liveStats);
-        centerPanel.add(progressBar);
+        centerPanel.add(ramLiveStats);
+        centerPanel.add(ramProgressBar);
 
-        JButton nextBtn = new JButton("Next ➡");
-        nextBtn.setEnabled(false);
+        ramNextBtn = new JButton("Next ➡");
+        ramNextBtn.setEnabled(false);
+        ramNextBtn.addActionListener(e -> cardLayout.show(container, "custom"));
 
-        p.add(title, BorderLayout.NORTH);
+        p.add(ramTitle, BorderLayout.NORTH);
         p.add(centerPanel, BorderLayout.CENTER);
-        p.add(nextBtn, BorderLayout.SOUTH);
+        p.add(ramNextBtn, BorderLayout.SOUTH);
 
-        // Run the RAM test in the background
+        return p;
+    }
+
+    // The actual background process for the RAM scan
+    private void runRamTest() {
         new SwingWorker<Long, Object[]>() {
             @Override
             protected Long doInBackground() throws Exception {
                 OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
 
-                int durationSeconds = 15; // Set to 15 seconds for GUI setup (adjust if you want 30)
+                int durationSeconds = 15;
                 long endTime = System.currentTimeMillis() + (durationSeconds * 1000L);
                 long nextSampleTime = System.currentTimeMillis() + 1000L;
 
@@ -77,23 +134,18 @@ public class SetupWizard extends JDialog {
                     long usedRam  = totalRam - freeRam;
                     double usagePercent = (double) usedRam / totalRam * 100;
 
-                    // Collect one sample per second
                     if (System.currentTimeMillis() >= nextSampleTime) {
                         usageSamples.add(usedRam);
                         nextSampleTime += 1000L;
                     }
 
-                    // Calculate progress bar percentage
                     long elapsed = (durationSeconds * 1000L) - Math.max(0, endTime - System.currentTimeMillis());
                     int progress = (int) ((elapsed * 100) / (durationSeconds * 1000L));
 
-                    // Send live data to the GUI thread
                     publish(new Object[]{progress, usagePercent, usedRam, totalRam});
-
-                    Thread.sleep(100); // 100ms refresh rate for smooth UI
+                    Thread.sleep(100);
                 }
 
-                // Calculate the average RAM used
                 long sum = 0;
                 for (long sample : usageSamples) {
                     sum += sample;
@@ -103,15 +155,14 @@ public class SetupWizard extends JDialog {
 
             @Override
             protected void process(List<Object[]> chunks) {
-                // Get the most recent update
                 Object[] latest = chunks.get(chunks.size() - 1);
                 int progress = (Integer) latest[0];
                 double usagePct = (Double) latest[1];
                 long usedRam = (Long) latest[2];
                 long totalRam = (Long) latest[3];
 
-                progressBar.setValue(progress);
-                liveStats.setText(String.format("Used: %.2f GB / %.2f GB (%.1f%%)",
+                ramProgressBar.setValue(progress);
+                ramLiveStats.setText(String.format("Used: %.2f GB / %.2f GB (%.1f%%)",
                         usedRam / 1e9, totalRam / 1e9, usagePct));
             }
 
@@ -119,32 +170,29 @@ public class SetupWizard extends JDialog {
             protected void done() {
                 try {
                     long avgRamBytes = get();
-                    long avgRamMb = avgRamBytes / (1024 * 1024); // Convert to MB to save in JSON
+                    long avgRamMb = avgRamBytes / (1024 * 1024);
 
-                    newStats.setBaseRam(avgRamMb); // Saves the baseline to your stats
+                    newStats.setBaseRam(avgRamMb);
 
-                    progressBar.setValue(100);
-                    title.setText("Baseline complete!");
-                    liveStats.setText(String.format("Average Baseline RAM: %.2f GB", avgRamBytes / 1e9));
-                    nextBtn.setEnabled(true);
+                    ramProgressBar.setValue(100);
+                    ramTitle.setText("Baseline complete!");
+                    ramLiveStats.setText(String.format("Average Baseline RAM: %.2f GB", avgRamBytes / 1e9));
+                    ramNextBtn.setEnabled(true);
                 } catch (Exception e) {
-                    liveStats.setText("Error measuring RAM.");
-                    nextBtn.setEnabled(true);
+                    ramLiveStats.setText("Error measuring RAM.");
+                    ramNextBtn.setEnabled(true);
                 }
             }
         }.execute();
-
-        nextBtn.addActionListener(e -> cardLayout.show(container, "custom"));
-        return p;
     }
 
+    // --- STEP 3: Customization ---
     private JPanel buildCustomizationCard() {
         JPanel p = new JPanel(new GridLayout(5, 2, 10, 15));
         p.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
         JTextField nameField = new JTextField("Dingus");
-        JComboBox<String> genderBox = new JComboBox<>(new String[]{"Male", "Female", "Non-binary", "Robot"});
-
+        JComboBox<String> genderBox = new JComboBox<>(new String[]{"Male (he/him)", "Female (she/her)", "Non-binary (they/them)"});
         JComboBox<String> colorBox = new JComboBox<>(new String[]{"Default (Orange)", "Void (Black)", "Ghost (White)"});
 
         p.add(new JLabel("Pet Name:"));
@@ -172,7 +220,6 @@ public class SetupWizard extends JDialog {
             newStats.setGender((String) genderBox.getSelectedItem());
             newStats.setSpriteColor((String) colorBox.getSelectedItem());
 
-            // Set starting defaults
             newStats.setHunger(100);
             newStats.setHappiness(100);
             newStats.setEnergy(100);
