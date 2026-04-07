@@ -10,7 +10,7 @@ import java.util.List;
 public class Main {
 
     static final int PET_WIDTH  = 360;
-    static final int PET_HEIGHT = 270;
+    static final int PET_HEIGHT = 290;
 
     public static void main(String[] args) {
         try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
