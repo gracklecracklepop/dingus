@@ -1,6 +1,8 @@
 import com.sun.management.OperatingSystemMXBean;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.*;
+import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,7 +12,7 @@ public class SetupWizard extends JDialog {
     private PetStats newStats = new PetStats();
 
     private CardLayout cardLayout = new CardLayout();
-    private JPanel container = new JPanel(cardLayout);
+    private JPanel cardPanel = new JPanel(cardLayout);
 
     // RAM UI components declared here so they can be updated when the test actually starts
     private JLabel ramTitle;
@@ -19,22 +21,44 @@ public class SetupWizard extends JDialog {
     private JButton ramNextBtn;
 
     public SetupWizard() {
-        setTitle("✨ First Time Setup");
+        setTitle("First Time Setup");
         setModal(true); // Blocks the rest of the app until finished
-        setSize(450, 350);
+        setSize(500, 400); // Slightly larger to fit the custom fonts nicely
         setLocationRelativeTo(null);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
-        setResizable(false);
 
-        // Add the three steps in order
-        container.add(buildIntroCard(), "intro");
-        container.add(buildRamCheckCard(), "ram");
-        container.add(buildCustomizationCard(), "custom");
+        // Remove standard Windows borders and remove from the taskbar
+        setUndecorated(true);
+        setType(Window.Type.UTILITY);
+        setBackground(new Color(0, 0, 0, 0)); // Transparent dialog background
 
-        add(container);
+        // Main container that draws the rounded dark background
+        JPanel mainContainer = new JPanel(new BorderLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(40, 40, 40, 240));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 15, 15);
+                g2.dispose();
+            }
+        };
+        mainContainer.setOpaque(false);
+        mainContainer.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+
+        // Add custom Draggable Header
+        mainContainer.add(buildHeader(), BorderLayout.NORTH);
+
+        // Setup the card panel (transparent so background shows through)
+        cardPanel.setOpaque(false);
+        cardPanel.add(buildIntroCard(), "intro");
+        cardPanel.add(buildRamCheckCard(), "ram");
+        cardPanel.add(buildCustomizationCard(), "custom");
+
+        mainContainer.add(cardPanel, BorderLayout.CENTER);
+        add(mainContainer);
 
         // Start on the intro screen
-        cardLayout.show(container, "intro");
+        cardLayout.show(cardPanel, "intro");
     }
 
     public boolean isFinished() {
@@ -45,13 +69,45 @@ public class SetupWizard extends JDialog {
         return newStats;
     }
 
+    // --- CUSTOM DRAGGABLE HEADER ---
+    private JPanel buildHeader() {
+        JPanel header = new JPanel(new BorderLayout());
+        header.setOpaque(false);
+
+        JLabel title = new JLabel("✨ Initial Setup");
+        title.setForeground(Color.WHITE);
+        title.setFont(loadFont(16));
+        header.add(title, BorderLayout.WEST);
+
+        JButton closeBtn = makeButton("X", () -> System.exit(0));
+        closeBtn.setPreferredSize(new Dimension(40, 30));
+        header.add(closeBtn, BorderLayout.EAST);
+
+        // Make window draggable via the header
+        Point[] offset = {null};
+        header.addMouseListener(new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) { offset[0] = e.getPoint(); }
+        });
+        header.addMouseMotionListener(new MouseMotionAdapter() {
+            @Override public void mouseDragged(MouseEvent e) {
+                if (offset[0] == null) return;
+                Point loc = getLocation();
+                setLocation(loc.x + e.getX() - offset[0].x, loc.y + e.getY() - offset[0].y);
+            }
+        });
+
+        return header;
+    }
+
     // --- STEP 1: The Intro / Warning Prompt ---
     private JPanel buildIntroCard() {
         JPanel p = new JPanel(new BorderLayout(10, 20));
-        p.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+        p.setOpaque(false);
+        p.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
         JLabel title = new JLabel("Welcome!", SwingConstants.CENTER);
-        title.setFont(new Font("SansSerif", Font.BOLD, 22));
+        title.setForeground(Color.WHITE);
+        title.setFont(loadFont(22));
 
         JTextArea instructions = new JTextArea(
                 "Before we create your pet, we need to measure your PC's baseline RAM usage so your pet knows when it's taking up too much space!\n\n" +
@@ -65,19 +121,14 @@ public class SetupWizard extends JDialog {
         instructions.setOpaque(false);
         instructions.setEditable(false);
         instructions.setFocusable(false);
-        instructions.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        instructions.setForeground(new Color(200, 200, 200));
+        instructions.setFont(loadFont(12));
 
-        JButton startBtn = new JButton("I'm Ready - Start Scan");
-        startBtn.setFont(new Font("SansSerif", Font.BOLD, 14));
-        startBtn.setBackground(new Color(100, 150, 255));
-        startBtn.setForeground(Color.WHITE);
-        startBtn.setFocusPainted(false);
-        startBtn.setPreferredSize(new Dimension(200, 40));
-
-        startBtn.addActionListener(e -> {
-            cardLayout.show(container, "ram");
-            runRamTest(); // Execute the RAM test ONLY after clicking this button
+        JButton startBtn = makeButton("Start Scan", () -> {
+            cardLayout.show(cardPanel, "ram");
+            runRamTest();
         });
+        startBtn.setPreferredSize(new Dimension(200, 40));
 
         p.add(title, BorderLayout.NORTH);
         p.add(instructions, BorderLayout.CENTER);
@@ -89,24 +140,31 @@ public class SetupWizard extends JDialog {
     // --- STEP 2: The RAM Scan Screen ---
     private JPanel buildRamCheckCard() {
         JPanel p = new JPanel(new BorderLayout(10, 20));
-        p.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
+        p.setOpaque(false);
+        p.setBorder(BorderFactory.createEmptyBorder(30, 20, 30, 20));
 
-        ramTitle = new JLabel("Establishing System RAM Baseline...", SwingConstants.CENTER);
-        ramTitle.setFont(new Font("SansSerif", Font.BOLD, 16));
+        ramTitle = new JLabel("Measuring Baseline...", SwingConstants.CENTER);
+        ramTitle.setForeground(Color.WHITE);
+        ramTitle.setFont(loadFont(16));
 
         ramLiveStats = new JLabel("Initializing scanner...", SwingConstants.CENTER);
-        ramLiveStats.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        ramLiveStats.setForeground(new Color(150, 255, 150)); // Hacker green text
+        ramLiveStats.setFont(loadFont(12));
 
         JPanel centerPanel = new JPanel(new GridLayout(2, 1, 0, 10));
+        centerPanel.setOpaque(false);
+
         ramProgressBar = new JProgressBar(0, 100);
         ramProgressBar.setStringPainted(true);
+        ramProgressBar.setBackground(new Color(60, 60, 60));
+        ramProgressBar.setForeground(new Color(100, 200, 100));
+        ramProgressBar.setBorderPainted(false);
 
         centerPanel.add(ramLiveStats);
         centerPanel.add(ramProgressBar);
 
-        ramNextBtn = new JButton("Next ➡");
+        ramNextBtn = makeButton("Next ➡", () -> cardLayout.show(cardPanel, "custom"));
         ramNextBtn.setEnabled(false);
-        ramNextBtn.addActionListener(e -> cardLayout.show(container, "custom"));
 
         p.add(ramTitle, BorderLayout.NORTH);
         p.add(centerPanel, BorderLayout.CENTER);
@@ -115,7 +173,6 @@ public class SetupWizard extends JDialog {
         return p;
     }
 
-    // The actual background process for the RAM scan
     private void runRamTest() {
         new SwingWorker<Long, Object[]>() {
             @Override
@@ -162,8 +219,7 @@ public class SetupWizard extends JDialog {
                 long totalRam = (Long) latest[3];
 
                 ramProgressBar.setValue(progress);
-                ramLiveStats.setText(String.format("Used: %.2f GB / %.2f GB (%.1f%%)",
-                        usedRam / 1e9, totalRam / 1e9, usagePct));
+                ramLiveStats.setText(String.format("Used: %.2f GB / %.2f GB (%.1f%%)", usedRam / 1e9, totalRam / 1e9, usagePct));
             }
 
             @Override
@@ -189,33 +245,31 @@ public class SetupWizard extends JDialog {
     // --- STEP 3: Customization ---
     private JPanel buildCustomizationCard() {
         JPanel p = new JPanel(new GridLayout(5, 2, 10, 15));
+        p.setOpaque(false);
         p.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
         JTextField nameField = new JTextField("Dingus");
-        JComboBox<String> genderBox = new JComboBox<>(new String[]{"Male (he/him)", "Female (she/her)", "Non-binary (they/them)"});
-        JComboBox<String> colorBox = new JComboBox<>(new String[]{"Default (Orange)", "Void (Black)", "Ghost (White)"});
+        styleInput(nameField);
 
-        p.add(new JLabel("Pet Name:"));
+        JComboBox<String> genderBox = new JComboBox<>(new String[]{"Male (he/him)", "Female (she/her)", "Non-binary (they/them)"});
+        styleInput(genderBox);
+
+        JComboBox<String> colorBox = new JComboBox<>(new String[]{"Default (Orange)", "Void (Black)", "Ghost (White)"});
+        styleInput(colorBox);
+
+        p.add(styledLabel("Pet Name:"));
         p.add(nameField);
 
-        p.add(new JLabel("Gender:"));
+        p.add(styledLabel("Gender:"));
         p.add(genderBox);
 
-        p.add(new JLabel("Sprite Color:"));
+        p.add(styledLabel("Sprite Color:"));
         p.add(colorBox);
 
         p.add(new JLabel()); // Spacer
         p.add(new JLabel()); // Spacer
 
-        JButton finishBtn = new JButton("Start Game!");
-        finishBtn.setBackground(new Color(100, 200, 100));
-        finishBtn.setForeground(Color.WHITE);
-        finishBtn.setFocusPainted(false);
-
-        p.add(new JLabel()); // Spacer
-        p.add(finishBtn);
-
-        finishBtn.addActionListener(e -> {
+        JButton finishBtn = makeButton("Start Game!", () -> {
             newStats.setName(nameField.getText());
             newStats.setGender((String) genderBox.getSelectedItem());
             newStats.setSpriteColor((String) colorBox.getSelectedItem());
@@ -229,6 +283,73 @@ public class SetupWizard extends JDialog {
             dispose(); // Close wizard
         });
 
+        // Give the start button a greenish tint
+        finishBtn.setBackground(new Color(80, 150, 80));
+
+        p.add(new JLabel()); // Spacer
+        p.add(finishBtn);
+
         return p;
+    }
+
+    // --- UTILITIES & STYLING ---
+
+    private JLabel styledLabel(String text) {
+        JLabel l = new JLabel(text);
+        l.setForeground(Color.WHITE);
+        l.setFont(loadFont(14));
+        return l;
+    }
+
+    private void styleInput(JComponent comp) {
+        comp.setBackground(new Color(60, 60, 60));
+        comp.setForeground(Color.WHITE);
+        comp.setFont(loadFont(12));
+        if (comp instanceof JTextField) {
+            ((JTextField) comp).setCaretColor(Color.WHITE);
+            comp.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        }
+    }
+
+    private JButton makeButton(String text, Runnable action) {
+        JButton btn = new JButton(text) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                Color bg = getBackground();
+                if (!isEnabled()) bg = new Color(50, 50, 50);
+                else if (getModel().isPressed())  bg = bg.darker();
+                else if (getModel().isRollover()) bg = bg.brighter();
+
+                g2.setColor(bg);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 7, 8);
+                g2.setColor(isEnabled() ? Color.WHITE : Color.GRAY);
+                g2.setFont(loadFont(14));
+                FontMetrics fm = g2.getFontMetrics();
+                g2.drawString(getText(),
+                        (getWidth()  - fm.stringWidth(getText())) / 2,
+                        (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
+                g2.dispose();
+            }
+        };
+
+        btn.setBackground(new Color(60, 60, 60));
+        btn.setForeground(Color.WHITE);
+        btn.setBorderPainted(false);
+        btn.setContentAreaFilled(false);
+        btn.setFocusPainted(false);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.addActionListener(e -> action.run());
+        return btn;
+    }
+
+    private static Font loadFont(int fontSize) {
+        try {
+            Font font = Font.createFont(Font.TRUETYPE_FONT, new File("images/Shape Bit.otf"));
+            GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font);
+            return font.deriveFont(Font.PLAIN, fontSize);
+        } catch (Exception e) {
+            return new Font("Arial", Font.PLAIN, fontSize); // fallback
+        }
     }
 }
