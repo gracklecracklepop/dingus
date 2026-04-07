@@ -56,6 +56,7 @@ public class PetPanel extends JPanel {
         } else {
             // Released — check whether we landed on the bed
             currentImage = isOverBed() ? bedImage : normalImage;
+
             menuToggleButton.setVisible(true);
         }
         repaint();
@@ -142,7 +143,8 @@ public class PetPanel extends JPanel {
         super.paintComponent(g);
         if (currentImage != null)
             g.drawImage(currentImage, 0, 0,
-                    (int)(screenSize.getWidth()  / 4),
-                    (int)(screenSize.getHeight() / 4), this);
+                (int)(screenSize.getWidth()  / 4),
+                (int)(screenSize.getHeight() / 4), this);
+        System.out.println("hi");
     }
 }
