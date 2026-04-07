@@ -37,8 +37,6 @@ public class SaveManager {
         if (!f.exists()) {
             System.out.println("No save file found — starting fresh.");
             measuring.test();
-            while(!measuring.done){
-            }
             return staty;
         }
         try {

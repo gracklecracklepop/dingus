@@ -49,7 +49,6 @@ public class Main {
             Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
             dialog.setLocation(screen.width - PET_WIDTH, screen.height - PET_HEIGHT - 45);
 
-
             PetPanel panel = new PetPanel(dialog);
             panel.setOpaque(false);
 

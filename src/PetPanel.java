@@ -27,13 +27,13 @@ public class PetPanel extends JPanel {
     public PetPanel(JDialog dialog) {
         this.dialog = dialog;
         setLayout(null);
-        PetStats stats = SaveManager.load();
+
         normalImage  = loadImage("images/catsitting.png");
         dragImage    = loadImage("images/catscruff.jpg");
         bedImage     = loadImage("images/catinbed.jpg");
         currentImage = normalImage;
 
-
+        PetStats stats = SaveManager.load();
         menu = new PetMenu(stats, dialog);
 
         menuToggleButton = buildToggleButton();
