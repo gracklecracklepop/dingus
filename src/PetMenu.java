@@ -6,8 +6,77 @@ import java.io.File;
 
 public class PetMenu {
 
-    static final int WIDTH = 150;
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ██████████████████████████  THEME CONFIGURATION  ██████████████████████████
+    // ═══════════════════════════════════════════════════════════════════════════
 
+    // ─── BACKGROUNDS ───────────────────────────────────────────────────────────
+    private static final Color BG_MAIN              = new Color(40, 40, 40);
+    private static final Color BG_MAIN_TRANSPARENT  = new Color(40, 40, 40, 240);
+    private static final Color BG_INPUT             = new Color(60, 60, 60);
+    private static final Color BG_INPUT_BORDER      = new Color(80, 80, 80);
+    private static final Color BG_DROPDOWN_SELECTED = new Color(80, 120, 80);
+
+    // ─── BUTTONS ───────────────────────────────────────────────────────────────
+    private static final Color BTN_DEFAULT          = new Color(60, 60, 60);
+    private static final Color BTN_HOVER            = new Color(100, 100, 100);
+    private static final Color BTN_PRESSED          = new Color(80, 80, 80);
+    private static final Color BTN_PRIMARY          = new Color(80, 150, 80);
+    private static final Color BTN_CLOSE            = new Color(150, 60, 60);
+
+    // ─── TEXT COLORS ───────────────────────────────────────────────────────────
+    private static final Color TEXT_PRIMARY         = new Color(255, 255, 255);
+    private static final Color TEXT_SECONDARY       = new Color(200, 200, 200);
+    private static final Color TEXT_DISABLED        = new Color(128, 128, 128);
+
+    // ─── ACCENT COLORS ─────────────────────────────────────────────────────────
+    private static final Color ACCENT_COINS         = new Color(255, 215, 0);
+    private static final Color ACCENT_SUCCESS       = new Color(100, 200, 100);
+    private static final Color ACCENT_ERROR         = new Color(255, 100, 100);
+
+    // ─── PROGRESS BARS ─────────────────────────────────────────────────────────
+    private static final Color PROGRESS_TRACK       = new Color(60, 60, 60);
+    private static final Color PROGRESS_HIGH        = new Color(100, 200, 100);  // >= 70%
+    private static final Color PROGRESS_MED         = new Color(255, 200, 50);   // >= 30%
+    private static final Color PROGRESS_LOW         = new Color(255, 80, 80);    // < 30%
+
+    // ─── SHOP ──────────────────────────────────────────────────────────────────
+    private static final Color BG_SHOP_MAIN         = new Color(30, 30, 30);
+    private static final Color BG_SHOP_HEADER       = new Color(40, 40, 40);
+    private static final Color BG_SHOP_SLOT         = new Color(50, 50, 50);
+    private static final Color BG_SHOP_SLOT_BORDER  = new Color(70, 70, 70);
+    private static final Color BG_SHOP_BUY          = new Color(70, 70, 70);
+    private static final Color BG_SHOP_OWNED        = new Color(100, 150, 100);
+    private static final Color BG_SHOP_NO_FUNDS     = new Color(150, 50, 50);
+
+    // ─── SCROLLBAR ─────────────────────────────────────────────────────────────
+    private static final Color SCROLLBAR_THUMB      = new Color(120, 120, 120, 200);
+    private static final Color SCROLLBAR_TRACK      = new Color(0, 0, 0, 0);
+
+    // ─── FONTS ─────────────────────────────────────────────────────────────────
+    private static final String FONT_PATH           = "images/Shape Bit.otf";
+    private static final String FONT_FALLBACK       = "Arial";
+
+    private static final int FONT_SIZE_TITLE        = 22;
+    private static final int FONT_SIZE_HEADING      = 17;
+    private static final int FONT_SIZE_BUTTON       = 13;
+    private static final int FONT_SIZE_LABEL        = 12;
+    private static final int FONT_SIZE_BODY         = 12;
+    private static final int FONT_SIZE_SMALL        = 10;
+
+    // ─── SIZING ────────────────────────────────────────────────────────────────
+    static final int WIDTH                          = 150;
+    private static final int CORNER_RADIUS          = 15;
+    private static final int BUTTON_CORNER_RADIUS   = 7;
+    private static final int SCROLL_HEIGHT          = 230;
+    private static final int SCROLLBAR_WIDTH        = 3;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ████████████████████████  END THEME CONFIGURATION  ████████████████████████
+    // ═══════════════════════════════════════════════════════════════════════════
+
+
+    // ─── Instance Variables ────────────────────────────────────────────────────
     private final JPanel panel;
     private final PetStats stats;
 
@@ -15,11 +84,8 @@ public class PetMenu {
     private JPanel container;
     private JPanel statsPanel;
 
-    // Live bar references for main menu only
     private JProgressBar hungerBar, happinessBar, energyBar;
     private JLabel hungerLabel, happinessLabel, energyLabel;
-
-    // Live coin label on the main menu
     private JLabel mainMenuCoinLabel;
 
     private static final String[] GRASS_URLS = {
@@ -28,6 +94,21 @@ public class PetMenu {
             "https://media.istockphoto.com/id/161820827/photo/morning-dew-drops-on-green-leafs.jpg?s=612x612&w=0&k=20&c=qxLfhCiF7yuICQr_Nm9c1ORLl3HDaSk8_F-xs_P5S-w=",
             "https://www.monrovia.com/media/catalog/product/cache/7b381462074fb6871f01f9faa7ed2e11/r/e/rest_2_2_2226.webp"
     };
+
+    // ─── Font Cache ────────────────────────────────────────────────────────────
+    private static Font cachedFont = null;
+
+    private static Font loadFont(int fontSize) {
+        if (cachedFont == null) {
+            try {
+                cachedFont = Font.createFont(Font.TRUETYPE_FONT, new File(FONT_PATH));
+                GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(cachedFont);
+            } catch (Exception e) {
+                cachedFont = new Font(FONT_FALLBACK, Font.PLAIN, fontSize);
+            }
+        }
+        return cachedFont.deriveFont(Font.PLAIN, (float) fontSize);
+    }
 
     public PetMenu(PetStats stats, JDialog dialog) {
         this.stats = stats;
@@ -49,38 +130,36 @@ public class PetMenu {
     // ── Main Menu ───────────────────────────────────────────────
 
     private JPanel buildMainMenu(JDialog dialog) {
-        // 1. Create main wrapper with the rounded dark background
         JPanel wrapper = new JPanel(new BorderLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(40, 40, 40, 240));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 15, 15);
+                g2.setColor(BG_MAIN_TRANSPARENT);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), CORNER_RADIUS, CORNER_RADIUS);
                 g2.dispose();
             }
         };
         wrapper.setOpaque(false);
         wrapper.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
-        // 2. Fixed Header Panel (Title on left, Coins on right)
+        // Header
         JPanel header = new JPanel(new BorderLayout());
         header.setOpaque(false);
-        header.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0)); // Spacing below header
+        header.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
 
         JLabel title = new JLabel("🐱 " + stats.getName());
-        title.setForeground(Color.WHITE);
+        title.setForeground(TEXT_PRIMARY);
         title.setFont(loadFont(15));
 
         mainMenuCoinLabel = new JLabel("🪙 " + stats.getCoins());
-        mainMenuCoinLabel.setForeground(new Color(255, 215, 0));
-        mainMenuCoinLabel.setFont(loadFont(12));
+        mainMenuCoinLabel.setForeground(ACCENT_COINS);
+        mainMenuCoinLabel.setFont(loadFont(FONT_SIZE_LABEL));
 
         header.add(title, BorderLayout.WEST);
         header.add(mainMenuCoinLabel, BorderLayout.EAST);
+        wrapper.add(header, BorderLayout.NORTH);
 
-        wrapper.add(header, BorderLayout.NORTH); // Pins it to the top
-
-        // 3. Scrollable Content Panel
+        // Scrollable content
         JPanel content = new JPanel();
         content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
         content.setOpaque(false);
@@ -121,29 +200,26 @@ public class PetMenu {
             save();
         });
 
-        addButton(content, "🛒 Shop", this::openShopWindow);
+        addButton(content, "🛒 Shop",     this::openShopWindow);
         addButton(content, "⚙️ Settings", () -> System.out.println("Opening settings!"));
         addButton(content, "👁 Hide",     () -> PetTray.hide(dialog));
         addButton(content, "❌ Exit",     () -> { save(); PetTray.remove(); System.exit(0); });
 
-        // 4. Configure Scroll Pane
+        // Scroll pane
         JScrollPane scrollPane = new JScrollPane(content);
         scrollPane.setOpaque(false);
         scrollPane.getViewport().setOpaque(false);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5)); // Tiny right padding so scrollbar doesn't overlap edges
+        scrollPane.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
         scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.setPreferredSize(new Dimension(WIDTH, SCROLL_HEIGHT));
 
-        // Lock the height of the scroll area so scrolling is required (e.g. 230px tall)
-        scrollPane.setPreferredSize(new Dimension(WIDTH, 230));
-
-        // Apply Custom Thin Scrollbar UI
         JScrollBar verticalBar = scrollPane.getVerticalScrollBar();
-        verticalBar.setPreferredSize(new Dimension(3, 0)); // Ultra thin
-        verticalBar.setUnitIncrement(16); // Smooth scrolling speed
+        verticalBar.setPreferredSize(new Dimension(SCROLLBAR_WIDTH, 0));
+        verticalBar.setUnitIncrement(16);
         verticalBar.setUI(new BasicScrollBarUI() {
             @Override protected void configureScrollBarColors() {
-                this.thumbColor = new Color(120, 120, 120, 200);
-                this.trackColor = new Color(0, 0, 0, 0); // Transparent track
+                this.thumbColor = SCROLLBAR_THUMB;
+                this.trackColor = SCROLLBAR_TRACK;
             }
             @Override protected JButton createDecreaseButton(int orientation) { return createZeroButton(); }
             @Override protected JButton createIncreaseButton(int orientation) { return createZeroButton(); }
@@ -160,11 +236,10 @@ public class PetMenu {
                 g2.fillRoundRect(thumbBounds.x, thumbBounds.y, thumbBounds.width, thumbBounds.height, 3, 3);
                 g2.dispose();
             }
-            @Override protected void paintTrack(Graphics g, JComponent c, Rectangle trackBounds) {} // Hidden
+            @Override protected void paintTrack(Graphics g, JComponent c, Rectangle trackBounds) {}
         });
 
-        wrapper.add(scrollPane, BorderLayout.CENTER); // Fills remaining space below header
-
+        wrapper.add(scrollPane, BorderLayout.CENTER);
         return wrapper;
     }
 
@@ -176,95 +251,141 @@ public class PetMenu {
         stats.printStats();
     }
 
-    // ── Shop Menu (Centered Pop-up) ──────────────────────────────
+    // ── Shop Menu ───────────────────────────────────────────────
 
     private void openShopWindow() {
         JDialog shopDialog = new JDialog();
-        shopDialog.setTitle("🛒 Accessory Shop");
         shopDialog.setModal(true);
         shopDialog.setSize(500, 600);
         shopDialog.setLocationRelativeTo(null);
-        shopDialog.setLayout(new BorderLayout());
-        shopDialog.getContentPane().setBackground(new Color(30, 30, 30));
+        shopDialog.setUndecorated(true);
+        shopDialog.setType(Window.Type.UTILITY);
+        shopDialog.setBackground(new Color(0, 0, 0, 0));
 
+        // ── Outer container: rounded dark background ──────────────
+        JPanel mainContainer = new JPanel(new BorderLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(BG_MAIN_TRANSPARENT);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), CORNER_RADIUS, CORNER_RADIUS);
+                g2.dispose();
+            }
+        };
+        mainContainer.setOpaque(false);
+        mainContainer.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+
+        // ── Header: title on left, coins in center, X on right ────
         JPanel header = new JPanel(new BorderLayout());
-        header.setBackground(new Color(40, 40, 40));
-        header.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+        header.setOpaque(false);
+        header.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
 
-        JLabel title = new JLabel("Accessory Shop");
-        title.setForeground(Color.WHITE);
-        title.setFont(loadFont(20));
+        JLabel title = new JLabel("🛒 Accessory Shop");
+        title.setForeground(TEXT_PRIMARY);
+        title.setFont(loadFont(FONT_SIZE_HEADING));
 
         JLabel shopCoinLabel = new JLabel("🪙 " + stats.getCoins());
-        shopCoinLabel.setForeground(new Color(255, 215, 0));
-        shopCoinLabel.setFont(loadFont(18));
+        shopCoinLabel.setForeground(ACCENT_COINS);
+        shopCoinLabel.setFont(loadFont(FONT_SIZE_LABEL));
 
-        header.add(title, BorderLayout.WEST);
-        header.add(shopCoinLabel, BorderLayout.EAST);
-        shopDialog.add(header, BorderLayout.NORTH);
+        JButton closeBtn = makeButton("X", shopDialog::dispose);
+        closeBtn.setBackground(BTN_CLOSE);
+        closeBtn.setPreferredSize(new Dimension(40, 30));
 
-        JPanel grid = new JPanel(new GridLayout(0, 4, 15, 15));
-        grid.setBackground(new Color(30, 30, 30));
-        grid.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        header.add(title,        BorderLayout.WEST);
+        header.add(shopCoinLabel, BorderLayout.CENTER);
+        header.add(closeBtn,     BorderLayout.EAST);
+
+        // Draggable header
+        Point[] offset = {null};
+        header.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mousePressed(java.awt.event.MouseEvent e) {
+                offset[0] = e.getPoint();
+            }
+        });
+        header.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+            @Override public void mouseDragged(java.awt.event.MouseEvent e) {
+                if (offset[0] == null) return;
+                Point loc = shopDialog.getLocation();
+                shopDialog.setLocation(loc.x + e.getX() - offset[0].x,
+                        loc.y + e.getY() - offset[0].y);
+            }
+        });
+
+        mainContainer.add(header, BorderLayout.NORTH);
+
+        // ── Grid content ──────────────────────────────────────────
+        JPanel grid = new JPanel(new GridLayout(0, 3, 15, 15));
+        grid.setOpaque(false);
+        grid.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 
         String[] sampleIcons = {"🎩", "👓", "🎀", "👑", "🎒", "🧣", "🎧", "🌸", "🕶️", "🧢"};
 
-        for (int i = 0; i < 40; i++) {
+        for (int i = 0; i < 21; i++) {
             String iconStr = sampleIcons[i % sampleIcons.length];
             int price = (i + 1) * 10;
             String uniqueItemId = "acc_" + i;
-
-            JPanel slot = createShopSlot(iconStr, price, shopCoinLabel, uniqueItemId);
-            grid.add(slot);
+            grid.add(createShopSlot(iconStr, price, shopCoinLabel, uniqueItemId));
         }
 
         JScrollPane scrollPane = new JScrollPane(grid);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        scrollPane.setBackground(new Color(30, 30, 30));
-        shopDialog.add(scrollPane, BorderLayout.CENTER);
+        scrollPane.setOpaque(false);
+        scrollPane.getViewport().setOpaque(false);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
+        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
-        JPanel footer = new JPanel();
-        footer.setBackground(new Color(40, 40, 40));
-        footer.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JScrollBar verticalBar = scrollPane.getVerticalScrollBar();
+        verticalBar.setPreferredSize(new Dimension(SCROLLBAR_WIDTH, 0));
+        verticalBar.setUnitIncrement(16);
+        verticalBar.setUI(new BasicScrollBarUI() {
+            @Override protected void configureScrollBarColors() {
+                this.thumbColor = SCROLLBAR_THUMB;
+                this.trackColor = SCROLLBAR_TRACK;
+            }
+            @Override protected JButton createDecreaseButton(int o) { return createZeroButton(); }
+            @Override protected JButton createIncreaseButton(int o) { return createZeroButton(); }
+            private JButton createZeroButton() {
+                JButton b = new JButton(); b.setPreferredSize(new Dimension(0, 0)); return b;
+            }
+            @Override protected void paintThumb(Graphics g, JComponent c, Rectangle r) {
+                if (r.isEmpty() || !scrollbar.isEnabled()) return;
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(thumbColor);
+                g2.fillRoundRect(r.x, r.y, r.width, r.height, 3, 3);
+                g2.dispose();
+            }
+            @Override protected void paintTrack(Graphics g, JComponent c, Rectangle r) {}
+        });
 
-        JButton closeBtn = new JButton("Close Shop");
-        closeBtn.setFont(loadFont(14));
-        closeBtn.setBackground(new Color(255, 100, 100));
-        closeBtn.setForeground(Color.WHITE);
-        closeBtn.setFocusPainted(false);
-        closeBtn.addActionListener(e -> shopDialog.dispose());
+        mainContainer.add(scrollPane, BorderLayout.CENTER);
 
-        footer.add(closeBtn);
-        shopDialog.add(footer, BorderLayout.SOUTH);
-
+        shopDialog.add(mainContainer);
         shopDialog.setVisible(true);
     }
 
     private JPanel createShopSlot(String icon, int price, JLabel shopCoinLabel, String itemId) {
         JPanel slot = new JPanel(new BorderLayout(0, 5));
-        slot.setBackground(new Color(50, 50, 50));
+        slot.setBackground(BG_SHOP_SLOT);
         slot.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(70, 70, 70), 2),
+                BorderFactory.createLineBorder(BG_SHOP_SLOT_BORDER, 2),
                 BorderFactory.createEmptyBorder(10, 5, 5, 5)
         ));
 
         JLabel iconLabel = new JLabel(icon, SwingConstants.CENTER);
         iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 40));
-        iconLabel.setForeground(Color.WHITE);
+        iconLabel.setForeground(TEXT_PRIMARY);
 
-        JButton buyBtn = new JButton();
-        buyBtn.setFont(loadFont(12));
-        buyBtn.setFocusPainted(false);
-        buyBtn.setForeground(Color.WHITE);
+        JButton buyBtn = makeButton("", null); // text set below
+        buyBtn.setFont(loadFont(FONT_SIZE_BODY));
 
         if (stats.ownsAccessory(itemId)) {
             buyBtn.setText("Owned");
-            buyBtn.setBackground(new Color(100, 150, 100));
+            buyBtn.setBackground(BG_SHOP_OWNED);
             buyBtn.setEnabled(false);
         } else {
             buyBtn.setText(price + " 🪙");
-            buyBtn.setBackground(new Color(70, 70, 70));
+            buyBtn.setBackground(BG_SHOP_BUY);
 
             buyBtn.addActionListener(e -> {
                 if (stats.getCoins() >= price) {
@@ -276,11 +397,11 @@ public class PetMenu {
                     mainMenuCoinLabel.setText("🪙 " + stats.getCoins());
 
                     buyBtn.setText("Owned");
-                    buyBtn.setBackground(new Color(100, 150, 100));
+                    buyBtn.setBackground(BG_SHOP_OWNED);
                     buyBtn.setEnabled(false);
                 } else {
-                    buyBtn.setBackground(new Color(150, 50, 50));
-                    Timer t = new Timer(200, evt -> buyBtn.setBackground(new Color(70, 70, 70)));
+                    buyBtn.setBackground(BG_SHOP_NO_FUNDS);
+                    Timer t = new Timer(200, evt -> buyBtn.setBackground(BG_SHOP_BUY));
                     t.setRepeats(false);
                     t.start();
                 }
@@ -297,9 +418,7 @@ public class PetMenu {
     private void updateBar(JProgressBar bar, JLabel label, String name, int value) {
         bar.setValue(value);
         label.setText(name + ": " + value + "%");
-        if (value >= 70)      bar.setForeground(new Color(100, 200, 100));
-        else if (value >= 30) bar.setForeground(new Color(255, 200, 50));
-        else                  bar.setForeground(new Color(255, 80, 80));
+        bar.setForeground(progressColor(value));
         bar.repaint();
         label.repaint();
     }
@@ -319,8 +438,8 @@ public class PetMenu {
         JPanel p = createBasePanel();
 
         JLabel title = new JLabel("📊 Stats");
-        title.setForeground(Color.WHITE);
-        title.setFont(loadFont(17));
+        title.setForeground(TEXT_PRIMARY);
+        title.setFont(loadFont(FONT_SIZE_HEADING));
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
         p.add(title);
         p.add(Box.createVerticalStrut(10));
@@ -330,14 +449,13 @@ public class PetMenu {
         p.add(makeBar("Energy",    stats.getEnergy()));    p.add(Box.createVerticalStrut(10));
 
         JLabel coins = new JLabel("🪙 Coins: " + stats.getCoins());
-        coins.setForeground(new Color(255, 215, 0));
-        coins.setFont(loadFont(10));
+        coins.setForeground(ACCENT_COINS);
+        coins.setFont(loadFont(FONT_SIZE_SMALL));
         coins.setAlignmentX(Component.CENTER_ALIGNMENT);
         p.add(coins);
         p.add(Box.createVerticalStrut(10));
 
         addButton(p, "⬅ Back", () -> cardLayout.show(container, "menu"));
-
         return p;
     }
 
@@ -348,8 +466,8 @@ public class PetMenu {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(40, 40, 40, 240));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 15, 15);
+                g2.setColor(BG_MAIN_TRANSPARENT);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), CORNER_RADIUS, CORNER_RADIUS);
                 g2.dispose();
             }
         };
@@ -361,19 +479,25 @@ public class PetMenu {
 
     private JLabel styledLabel(String text) {
         JLabel l = new JLabel(text);
-        l.setForeground(Color.WHITE);
-        l.setFont(loadFont(12));
+        l.setForeground(TEXT_PRIMARY);
+        l.setFont(loadFont(FONT_SIZE_LABEL));
         return l;
+    }
+
+    private Color progressColor(int value) {
+        if (value >= 70) {return PROGRESS_HIGH;}
+        else if (value >= 30) {return PROGRESS_MED;}
+
+       else{ return PROGRESS_LOW;}
+
     }
 
     private JProgressBar makeProgressBar(int value) {
         JProgressBar bar = new JProgressBar(0, 100);
         bar.setValue(Math.max(0, Math.min(100, value)));
         bar.setStringPainted(false);
-        bar.setBackground(new Color(60, 60, 60));
-        if (value >= 70)      bar.setForeground(new Color(100, 200, 100));
-        else if (value >= 30) bar.setForeground(new Color(255, 200, 50));
-        else                  bar.setForeground(new Color(255, 80, 80));
+        bar.setBackground(PROGRESS_TRACK);
+        bar.setForeground(progressColor(value));
         return bar;
     }
 
@@ -387,8 +511,7 @@ public class PetMenu {
     }
 
     private JPanel makeBar(String label, int value) {
-        JLabel l = styledLabel(label + ": " + value + "%");
-        return wrapBar(l, makeProgressBar(value));
+        return wrapBar(styledLabel(label + ": " + value + "%"), makeProgressBar(value));
     }
 
     private void addButton(JPanel parent, String label, Runnable action) {
@@ -401,13 +524,20 @@ public class PetMenu {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                Color bg = getModel().isPressed()  ? new Color(80,80,80)
-                        : getModel().isRollover() ? new Color(100,100,100)
-                        : new Color(60,60,60);
+
+                Color bg = getBackground();
+                if (!isEnabled()) {
+                    bg = new Color(50, 50, 50);
+                } else if (getModel().isPressed()) {
+                    bg = BTN_PRESSED;
+                } else if (getModel().isRollover()) {
+                    bg = BTN_HOVER;
+                }
+
                 g2.setColor(bg);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 7, 20);
-                g2.setColor(Color.WHITE);
-                g2.setFont(loadFont(13));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), BUTTON_CORNER_RADIUS, BUTTON_CORNER_RADIUS + 1);
+                g2.setColor(isEnabled() ? TEXT_PRIMARY : TEXT_DISABLED);
+                g2.setFont(loadFont(FONT_SIZE_BUTTON));
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(getText(),
                         (getWidth()  - fm.stringWidth(getText())) / 2,
@@ -416,8 +546,8 @@ public class PetMenu {
             }
         };
 
-        btn.setFont(loadFont(17));
-        btn.setForeground(Color.WHITE);
+        btn.setBackground(BTN_DEFAULT);
+        btn.setForeground(TEXT_PRIMARY);
         btn.setPreferredSize(new Dimension(WIDTH - 30, 40));
         btn.setMaximumSize(new Dimension(WIDTH - 20, 20));
         btn.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -425,18 +555,8 @@ public class PetMenu {
         btn.setContentAreaFilled(false);
         btn.setFocusPainted(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.addActionListener(e -> action.run());
+        if (action != null) btn.addActionListener(e -> action.run());
         return btn;
-    }
-
-    private static Font loadFont(int fontSize) {
-        try {
-            Font font = Font.createFont(Font.TRUETYPE_FONT, new File("images/Shape Bit.otf"));
-            GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font);
-            return font.deriveFont(Font.PLAIN, fontSize);
-        } catch (Exception e) {
-            return new Font("Arial", Font.PLAIN, fontSize);
-        }
     }
 
     private void save() { SaveManager.save(stats); }

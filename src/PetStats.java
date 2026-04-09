@@ -8,11 +8,12 @@ public class PetStats {
     public int energy = 100;
     public int coins = 0;
 
-    // --- NEW WIZARD VARIABLES ---
+    // --- WIZARD VARIABLES ---
     private String name = "Dingus";
     private String gender = "Robot";
     private String spriteColor = "Default (Orange)";
     private long baseRam = 0;
+    private double baseCpu = 0; // NEW: CPU baseline percentage
 
     // --- INVENTORY ---
     private Set<String> ownedAccessories = new HashSet<>();
@@ -20,7 +21,7 @@ public class PetStats {
     // Jackson requires empty constructor
     public PetStats() {}
 
-    // --- Standard Getters & Setters for everything ---
+    // --- Standard Getters & Setters ---
 
     public int getHunger() { return hunger; }
     public int getHappiness() { return happiness; }
@@ -38,6 +39,9 @@ public class PetStats {
 
     public long getBaseRam() { return baseRam; }
     public void setBaseRam(long baseRam) { this.baseRam = baseRam; }
+
+    public double getBaseCpu() { return baseCpu; }
+    public void setBaseCpu(double baseCpu) { this.baseCpu = baseCpu; }
 
     public void setHunger(int hunger) { this.hunger = clamp(hunger); }
     public void setHappiness(int happiness) { this.happiness = clamp(happiness); }
@@ -82,11 +86,14 @@ public class PetStats {
 
     public void printStats() {
         System.out.println("══════════════════════");
-        System.out.println("Name:      " + name);
-        System.out.println("Hunger:    " + hunger + "%");
-        System.out.println("Happiness: " + happiness + "%");
-        System.out.println("Energy:    " + energy + "%");
-        System.out.println("Coins:     " + coins);
+        System.out.println("Name:         " + name);
+        System.out.println("Hunger:       " + hunger + "%");
+        System.out.println("Happiness:    " + happiness + "%");
+        System.out.println("Energy:       " + energy + "%");
+        System.out.println("Coins:        " + coins);
+        System.out.println("Base RAM:     " + baseRam + " MB");
+        System.out.println("Base CPU:     " + String.format("%.1f", baseCpu) + "%");
+        System.out.println("Accessories:  " + ownedAccessories.size() + " owned");
         System.out.println("══════════════════════");
     }
 }
