@@ -380,7 +380,7 @@ public class PetMenu {
     private JPanel wrapBar(JLabel label, JProgressBar bar) {
         JPanel p = new JPanel(new BorderLayout());
         p.setOpaque(false);
-        p.setMaximumSize(new Dimension(WIDTH - 30, 30));
+        p.setMaximumSize(new Dimension(WIDTH - 30, 40));
         p.add(label, BorderLayout.NORTH);
         p.add(bar,   BorderLayout.CENTER);
         return p;
@@ -405,7 +405,7 @@ public class PetMenu {
                         : getModel().isRollover() ? new Color(100,100,100)
                         : new Color(60,60,60);
                 g2.setColor(bg);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 7, 20);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 7, 5);
                 g2.setColor(Color.WHITE);
                 g2.setFont(loadFont(13));
                 FontMetrics fm = g2.getFontMetrics();
@@ -418,7 +418,7 @@ public class PetMenu {
 
         btn.setFont(loadFont(17));
         btn.setForeground(Color.WHITE);
-        btn.setPreferredSize(new Dimension(WIDTH - 30, 40));
+        btn.setPreferredSize(new Dimension(WIDTH - 30, 30));
         btn.setMaximumSize(new Dimension(WIDTH - 20, 20));
         btn.setAlignmentX(Component.CENTER_ALIGNMENT);
         btn.setBorderPainted(false);

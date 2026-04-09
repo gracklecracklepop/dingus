@@ -10,13 +10,30 @@ import java.util.List;
 public class Main {
 
     static final int PET_WIDTH  = 360;
-    static final int PET_HEIGHT = 270;
+    static final int PET_HEIGHT = 290;
 
     public static void main(String[] args) {
         try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
         catch (Exception ignored) {}
 
         SwingUtilities.invokeLater(() -> {
+            // --- WIZARD CHECK ---
+            if (!SaveManager.saveExists()) {
+                SetupWizard wizard = new SetupWizard();
+                wizard.setVisible(true); // Blocks thread until wizard is closed
+
+                // If user closed the wizard using the 'X' button without finishing
+                if (!wizard.isFinished()) {
+                    System.exit(0);
+                }
+
+                // Save the newly generated stats from the wizard
+                SaveManager.save(wizard.getGeneratedStats());
+            }
+
+            // Now load stats (guaranteed to exist now)
+            PetStats currentStats = SaveManager.load();
+
             // Utility owner frame keeps the app off the taskbar
             JFrame hiddenOwner = new JFrame();
             hiddenOwner.setUndecorated(true);
@@ -31,6 +48,8 @@ public class Main {
                     icon.getScaledInstance(64,  64,  Image.SCALE_SMOOTH),
                     icon.getScaledInstance(128, 128, Image.SCALE_SMOOTH)
             ));
+
+            // --- RESTORED PET UI CREATION ---
 
             // Bed window — shown first so it sits behind the pet
             BedDialog bed = new BedDialog(hiddenOwner);
@@ -49,7 +68,8 @@ public class Main {
             Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
             dialog.setLocation(screen.width - PET_WIDTH, screen.height - PET_HEIGHT - 45);
 
-
+            // Pass the stats to the panel if you've updated it to accept them.
+            // If PetPanel doesn't take stats in its constructor, just leave it as new PetPanel(dialog);
             PetPanel panel = new PetPanel(dialog);
             panel.setOpaque(false);
 
