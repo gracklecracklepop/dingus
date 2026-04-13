@@ -9,7 +9,7 @@ public class Theme {
     // ═══════════════════════════════════════════════════════════════════════════
 
     public static final Color BG_MAIN              = new Color(40, 40, 40);
-    public static final Color BG_MAIN_TRANSPARENT  = new Color(40, 40, 40, 240);
+    public static final Color BG_MAIN_TRANSPARENT  = new Color(40, 40, 40, 255);
     public static final Color BG_INPUT             = new Color(60, 60, 60);
     public static final Color BG_INPUT_BORDER      = new Color(80, 80, 80);
     public static final Color BG_DROPDOWN_ITEM     = new Color(50, 50, 50);
@@ -130,9 +130,14 @@ public class Theme {
     // ═══════════════════════════════════════════════════════════════════════════
 
     public static Color progressColor(int value) {
-        if (value >= 70) return PROGRESS_HIGH;
-        if (value >= 30) return PROGRESS_MED;
-        return PROGRESS_LOW;
+        if (value >= 70) {
+            return PROGRESS_HIGH;
+        } else if (value >= 30) {
+            return PROGRESS_MED;
+        } else {
+            return PROGRESS_LOW;
+        }
+
     }
 
     public static void applyUIManagerDefaults() {

@@ -334,13 +334,35 @@ public class PetMenu {
     }
 
     private JProgressBar makeProgressBar(int value) {
-        JProgressBar bar = new JProgressBar(0, 100);
+        JProgressBar bar = new JProgressBar(0, 100) {
+            @Override
+            public void updateUI() {
+                setUI(new javax.swing.plaf.basic.BasicProgressBarUI() {
+                    @Override
+                    protected void paintDeterminate(Graphics g, JComponent c) {
+                        // Use c instead of bar — they are the same object
+                        int width  = (int)(c.getWidth() * ((double) ((JProgressBar) c).getValue() / ((JProgressBar) c).getMaximum()));
+                        int height = c.getHeight();
+
+                        // Background track
+                        g.setColor(Theme.PROGRESS_TRACK);
+                        g.fillRect(0, 0, c.getWidth(), height);
+
+                        // Filled portion
+                        g.setColor(c.getForeground());
+                        g.fillRect(0, 0, width, height);
+                    }
+                });
+            }
+        };
         bar.setValue(Math.max(0, Math.min(100, value)));
         bar.setStringPainted(false);
+        bar.setBorderPainted(false);
         bar.setBackground(Theme.PROGRESS_TRACK);
         bar.setForeground(Theme.progressColor(value));
         return bar;
     }
+
 
     private JPanel wrapBar(JLabel label, JProgressBar bar) {
         JPanel p = new JPanel(new BorderLayout());
