@@ -88,14 +88,14 @@ public class PetPanel extends JPanel {
         menuVisible = !menuVisible;
         if (menuVisible) {
             menuToggleButton.setText("✕");
-            dialog.setSize(Main.PET_WIDTH + PetMenu.WIDTH, Main.PET_HEIGHT);
-            dialog.setLocation(dialog.getX() - PetMenu.WIDTH, dialog.getY());
+            dialog.setSize(Main.PET_WIDTH + Theme.MENU_WIDTH, Main.PET_HEIGHT);
+            dialog.setLocation(dialog.getX() - Theme.MENU_WIDTH, dialog.getY());
             dialog.add(menu.getPanel(), BorderLayout.WEST);
         } else {
             menuToggleButton.setText("☰");
             dialog.remove(menu.getPanel());
             dialog.setSize(Main.PET_WIDTH, Main.PET_HEIGHT);
-            dialog.setLocation(dialog.getX() + PetMenu.WIDTH, dialog.getY());
+            dialog.setLocation(dialog.getX() + Theme.MENU_WIDTH, dialog.getY());
         }
         dialog.revalidate();
         dialog.repaint();
