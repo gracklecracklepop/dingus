@@ -1,6 +1,7 @@
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -9,10 +10,11 @@ import com.sun.management.OperatingSystemMXBean;
 public class PetPanel extends JPanel {
 
     private static final int BUTTON_SIZE = 30;
+    private static final int SNAP_MARGIN = 60;
 
-    private final BufferedImage normalImage;   // catsitting.png  — on desktop
-    private final BufferedImage dragImage;     // catscruff.jpg   — being dragged
-    private final BufferedImage bedImage;      // catinbed.png    — resting in bed
+    private final BufferedImage normalImage;
+    private final BufferedImage dragImage;
+    private final BufferedImage bedImage;
     private BufferedImage currentImage;
 
     private final JButton menuToggleButton;
@@ -20,7 +22,12 @@ public class PetPanel extends JPanel {
     private boolean menuVisible = false;
 
     private final JDialog dialog;
-    private BedDialog bed; // set after construction via setBedDialog()
+    private BedDialog bed;
+
+    private boolean isDragging = false;
+
+    private static final Cursor CURSOR_DEFAULT = Cursor.getDefaultCursor();
+    private static final Cursor CURSOR_GRAB    = Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR);
 
     Toolkit toolkit = Toolkit.getDefaultToolkit();
     Dimension screenSize = toolkit.getScreenSize();
@@ -45,19 +52,34 @@ public class PetPanel extends JPanel {
 
     // ── Public API ──────────────────────────────────────────────
 
-    /** Called from Main after BedDialog is constructed. */
     public void setBedDialog(BedDialog bed) {
         this.bed = bed;
+        bed.setVisible(false);
+        currentImage = bedImage;
+        repaint();
     }
 
     public void setDragging(boolean dragging) {
+        this.isDragging = dragging;
+
         if (dragging) {
+            setCursor(CURSOR_GRAB);
             currentImage = dragImage;
             menuToggleButton.setVisible(false);
             if (menuVisible) toggleMenu();
+            if (bed != null) bed.setVisible(true);
+
         } else {
-            // Released — check whether we landed on the bed
-            currentImage = isOverBed() ? bedImage : normalImage;
+            setCursor(CURSOR_DEFAULT);
+
+            if (isNearBed()) {
+                snapToBed();
+                currentImage = bedImage;
+                if (bed != null) bed.setVisible(false);
+            } else {
+                currentImage = normalImage;
+                if (bed != null) bed.setVisible(true);
+            }
 
             menuToggleButton.setVisible(true);
         }
@@ -70,18 +92,22 @@ public class PetPanel extends JPanel {
                 && p.y >= 5 && p.y <= 5 + BUTTON_SIZE;
     }
 
-    // ── Bed overlap detection ────────────────────────────────────
+    // ── Bed Detection & Snapping ─────────────────────────────────
 
-    /**
-     * Returns true when the pet dialog's bounds intersect the bed dialog's bounds.
-     * Uses screen coordinates so the comparison is always accurate regardless of
-     * where either window happens to be.
-     */
-    private boolean isOverBed() {
+    private boolean isNearBed() {
         if (bed == null) return false;
-        Rectangle petBounds = dialog.getBounds();
         Rectangle bedBounds = bed.getBounds();
-        return petBounds.intersects(bedBounds);
+        Rectangle snapZone = new Rectangle(
+                bedBounds.x      - SNAP_MARGIN,
+                bedBounds.y      - SNAP_MARGIN,
+                bedBounds.width  + SNAP_MARGIN * 2,
+                bedBounds.height + SNAP_MARGIN * 2
+        );
+        return dialog.getBounds().intersects(snapZone);
+    }
+
+    private void snapToBed() {
+        dialog.setLocation(BedDialog.getCatSnapPosition());
     }
 
     // ── Private helpers ──────────────────────────────────────────
@@ -108,13 +134,13 @@ public class PetPanel extends JPanel {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                Color bg = getModel().isPressed()  ? new Color(60,60,60,220)
-                        : getModel().isRollover() ? new Color(80,80,80,220)
-                        :                           new Color(50,50,50,200);
+                Color bg = getModel().isPressed()  ? new Color(60, 60, 60, 220)
+                        : getModel().isRollover() ? new Color(80, 80, 80, 220)
+                        :                           new Color(50, 50, 50, 200);
                 g2.setColor(bg);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
-                g2.setColor(new Color(100,100,100));
-                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 10, 10);
+                g2.setColor(new Color(100, 100, 100));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
                 g2.setColor(Color.WHITE);
                 g2.setFont(new Font("Arial", Font.BOLD, 16));
                 FontMetrics fm = g2.getFontMetrics();
@@ -129,8 +155,8 @@ public class PetPanel extends JPanel {
         btn.setFocusPainted(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btn.addActionListener(e -> toggleMenu());
-        btn.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override public void mousePressed(java.awt.event.MouseEvent e) { e.consume(); }
+        btn.addMouseListener(new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) { e.consume(); }
         });
         return btn;
     }
@@ -143,10 +169,17 @@ public class PetPanel extends JPanel {
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        if (currentImage != null)
-            g.drawImage(currentImage, 0, 0,
-                (int)(screenSize.getWidth()  / 4),
-                (int)(screenSize.getHeight() / 4), this);
-        System.out.println("hi");
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,  RenderingHints.VALUE_ANTIALIAS_ON);
+
+        int imgW = (int)(screenSize.getWidth()  / 4);
+        int imgH = (int)(screenSize.getHeight() / 4);
+
+        if (currentImage != null) {
+            g2.drawImage(currentImage, 0, 0, imgW, imgH, this);
+        }
+
+        g2.dispose();
     }
 }

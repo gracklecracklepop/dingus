@@ -5,10 +5,6 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 
-/**
- * A transparent, non-interactive window that renders the pet's bed.
- * It is anchored to a fixed screen position and cannot be dragged.
- */
 public class BedDialog extends JDialog {
 
     static final int BED_WIDTH  = 220;
@@ -21,19 +17,45 @@ public class BedDialog extends JDialog {
         setFocusable(false);
         setFocusableWindowState(false);
 
-        // Let all mouse events fall through to whatever is beneath
         AWTUtilities_setWindowOpaque(this);
 
         add(new BedPanel());
         pack();
     }
 
-    /** Position the bed so it sits at the bottom-right of the screen, matching the pet. */
+    // ── Positioning ──────────────────────────────────────────────
+
+    /** Position the bed at the bottom-right of the screen. */
     public void positionAtBottom() {
+        Point pos = getBedScreenPosition();
+        setLocation(pos.x, pos.y+105);
+    }
+
+    /**
+     * Single source of truth for where the bed sits on screen.
+     * Both BedDialog and PetPanel use this so they are always in sync.
+     */
+    public static Point getBedScreenPosition() {
         Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
-        int x = screen.width  - Main.PET_WIDTH  + (Main.PET_WIDTH  - BED_WIDTH)  / 2;
-        int y = screen.height - BED_HEIGHT - 45;
-        setLocation(x, y);
+        int x = screen.width  - BED_WIDTH  - 70;   // 20px from right edge
+        int y = screen.height - BED_HEIGHT - 132;    // 45px from bottom (taskbar)
+        return new Point(x, y);
+    }
+
+    /**
+     * Returns the screen position the pet dialog should snap to
+     * so the cat sprite sits correctly aligned over the bed sprite.
+     * Adjust snapOffsetX / snapOffsetY to fine-tune the alignment.
+     */
+    public static Point getCatSnapPosition() {
+        Point bedPos = getBedScreenPosition();
+
+        // How many pixels to shift the cat dialog relative to the bed
+        // Positive X = right, Positive Y = down
+        int snapOffsetX = (BED_WIDTH  - Main.PET_WIDTH)  / 2; // Center cat over bed horizontally
+        int snapOffsetY = (BED_HEIGHT - Main.PET_HEIGHT) / 2; // Center cat over bed vertically
+
+        return new Point(bedPos.x + snapOffsetX, bedPos.y + snapOffsetY);
     }
 
     // ── Inner panel that draws the bed ───────────────────────────
@@ -56,24 +78,16 @@ public class BedDialog extends JDialog {
             }
         }
 
-
-
         private static BufferedImage loadBedImage() {
             try { return ImageIO.read(new File("images/bed.png")); }
             catch (IOException ignored) { return null; }
         }
     }
 
-    /**
-     * Makes the window itself click-through on platforms that support it.
-     * Falls back silently if unavailable (e.g. some Linux WMs).
-     */
     private static void AWTUtilities_setWindowOpaque(Window w) {
         try {
             Class<?> util = Class.forName("com.sun.awt.AWTUtilities");
             util.getMethod("setWindowOpaque", Window.class, boolean.class).invoke(null, w, false);
-        } catch (Exception ignored) {
-            // Not available on all JVMs — transparency is still handled by the background color
-        }
+        } catch (Exception ignored) {}
     }
 }

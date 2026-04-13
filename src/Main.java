@@ -12,7 +12,6 @@ public class Main {
     static final int PET_WIDTH  = 360;
     static final int PET_HEIGHT = 290;
 
-
     public static void main(String[] args) {
         try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
         catch (Exception ignored) {}
@@ -81,7 +80,6 @@ public class Main {
 
             PetTray.setup(dialog, bed, icon);
             attachDragListener(panel, dialog);
-
 
             // Pet dialog shown after bed — naturally renders on top
             dialog.setVisible(true);
@@ -161,5 +159,4 @@ public class Main {
     private static void drawEar(Graphics2D g, int[] xs, int[] ys) {
         g.fillPolygon(xs, ys, 3);
     }
-
 }
