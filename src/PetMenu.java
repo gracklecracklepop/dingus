@@ -1,7 +1,10 @@
+import com.sun.management.OperatingSystemMXBean;
+
 import javax.swing.*;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import java.awt.*;
 import java.awt.Desktop;
+import java.lang.management.ManagementFactory;
 
 public class PetMenu {
 
@@ -15,6 +18,8 @@ public class PetMenu {
     private JProgressBar hungerBar, happinessBar, energyBar;
     private JLabel hungerLabel, happinessLabel, energyLabel;
     private JLabel mainMenuCoinLabel;
+
+    private javax.swing.Timer usageTimer;
 
     private static final String[] GRASS_URLS = {
             "https://www.thisoldhouse.com/wp-content/uploads/2020/08/iStock_511747120-scaled.jpg",
@@ -39,6 +44,30 @@ public class PetMenu {
     }
 
     public JPanel getPanel() { return panel; }
+
+    // ── Usage Timer ─────────────────────────────────────────────
+
+    public void startUsageTimer() {
+        if (usageTimer != null) usageTimer.stop();
+        usageTimer = new javax.swing.Timer(1000, e -> usageAdd());
+        usageTimer.start();
+    }
+
+    public void stopUsageTimer() {
+        if (usageTimer != null) {
+            usageTimer.stop();
+            usageTimer = null;
+        }
+    }
+
+    public void usageAdd() {
+        OperatingSystemMXBean osBean = (OperatingSystemMXBean)
+                ManagementFactory.getOperatingSystemMXBean();
+            //ramUsage.runLiveMode(osBean);
+            long baseRam = PetStats.getBaseRam();
+            stats.addHunger(1);
+            updateLiveStats();
+    }
 
     // ── Main Menu ───────────────────────────────────────────────
 
@@ -106,7 +135,7 @@ public class PetMenu {
         addButton(content, "🛒 Shop",     this::openShopWindow);
         addButton(content, "⚙️ Settings", () -> System.out.println("Opening settings!"));
         addButton(content, "👁 Hide",     () -> PetTray.hide(dialog));
-        addButton(content, "❌ Exit",     () -> { save(); PetTray.remove(); System.exit(0); });
+        addButton(content, "❌ Exit",     () -> { stopUsageTimer(); save(); PetTray.remove(); System.exit(0); });
 
         // Scroll pane
         JScrollPane scrollPane = new JScrollPane(content);
@@ -340,15 +369,12 @@ public class PetMenu {
                 setUI(new javax.swing.plaf.basic.BasicProgressBarUI() {
                     @Override
                     protected void paintDeterminate(Graphics g, JComponent c) {
-                        // Use c instead of bar — they are the same object
                         int width  = (int)(c.getWidth() * ((double) ((JProgressBar) c).getValue() / ((JProgressBar) c).getMaximum()));
                         int height = c.getHeight();
 
-                        // Background track
                         g.setColor(Theme.PROGRESS_TRACK);
                         g.fillRect(0, 0, c.getWidth(), height);
 
-                        // Filled portion
                         g.setColor(c.getForeground());
                         g.fillRect(0, 0, width, height);
                     }
@@ -362,7 +388,6 @@ public class PetMenu {
         bar.setForeground(Theme.progressColor(value));
         return bar;
     }
-
 
     private JPanel wrapBar(JLabel label, JProgressBar bar) {
         JPanel p = new JPanel(new BorderLayout());
@@ -389,7 +414,7 @@ public class PetMenu {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
                 Color bg = getBackground();
-                if (!isEnabled())              bg = Theme.BTN_DISABLED;
+                if (!isEnabled())                bg = Theme.BTN_DISABLED;
                 else if (getModel().isPressed())  bg = Theme.BTN_PRESSED;
                 else if (getModel().isRollover()) bg = Theme.BTN_HOVER;
 

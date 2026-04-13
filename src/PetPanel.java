@@ -4,6 +4,7 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import com.sun.management.OperatingSystemMXBean;
 
 public class PetPanel extends JPanel {
 
@@ -35,6 +36,7 @@ public class PetPanel extends JPanel {
 
         PetStats stats = SaveManager.load();
         menu = new PetMenu(stats, dialog);
+        menu.startUsageTimer();
 
         menuToggleButton = buildToggleButton();
         menuToggleButton.setBounds(5, 5, BUTTON_SIZE, BUTTON_SIZE);
