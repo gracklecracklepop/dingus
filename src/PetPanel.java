@@ -114,13 +114,13 @@ public class PetPanel extends JPanel {
         menuVisible = !menuVisible;
         if (menuVisible) {
             menuToggleButton.setFont(Theme.emojiFont(40));
-            menuToggleButton.setText("🤍");
+            menuToggleButton.setText("❌");
             dialog.setSize(Main.PET_WIDTH + Theme.MENU_WIDTH, Main.PET_HEIGHT);
             dialog.setLocation(dialog.getX() - Theme.MENU_WIDTH, dialog.getY());
             dialog.add(menu.getPanel(), BorderLayout.WEST);
         } else {
             menuToggleButton.setFont(Theme.emojiFont(40));
-            menuToggleButton.setText("❌");
+            menuToggleButton.setText("🤍");
             dialog.remove(menu.getPanel());
             dialog.setSize(Main.PET_WIDTH, Main.PET_HEIGHT);
             dialog.setLocation(dialog.getX() + Theme.MENU_WIDTH, dialog.getY());
