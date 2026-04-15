@@ -30,7 +30,7 @@ public class SettingsDialog extends JDialog {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(Theme.BG_MAIN_TRANSPARENT);
+                g2.setColor(Theme.BG_MAIN);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), Theme.CORNER_RADIUS, Theme.CORNER_RADIUS);
                 g2.dispose();
             }

@@ -18,10 +18,10 @@ public class PetMenu {
     private JLabel mainMenuCoinLabel;
 
     // ── Cooldown tracking ───────────────────────────────────────
-    private static final long FEED_COOLDOWN_MS   = 15 * 60 * 1000L; // 30 minutes in ms
-    private long lastFedTime = 0L; // Epoch ms of last feed. 0 = never fed
-    private JButton feedButton; // Reference so we can update its label live
-    private Timer cooldownTimer; // Ticks every second to update the button label
+    private static final long FEED_COOLDOWN_MS = 15 * 60 * 1000L;
+    private long lastFedTime = 0L;
+    private JButton feedButton;
+    private Timer cooldownTimer;
 
     private static final String[] GRASS_URLS = {
             "https://www.thisoldhouse.com/wp-content/uploads/2020/08/iStock_511747120-scaled.jpg",
@@ -34,7 +34,7 @@ public class PetMenu {
         this.stats = stats;
 
         cardLayout = new CardLayout();
-        container = new JPanel(cardLayout);
+        container  = new JPanel(cardLayout);
         container.setOpaque(false);
 
         container.add(buildMainMenu(dialog), "menu");
@@ -44,7 +44,6 @@ public class PetMenu {
 
         this.panel = container;
 
-        // Start the cooldown ticker so the button label updates every second
         cooldownTimer = new Timer(1000, e -> refreshFeedButton());
         cooldownTimer.start();
     }
@@ -58,21 +57,18 @@ public class PetMenu {
     }
 
     private long feedCooldownRemainingMs() {
-        long remaining = FEED_COOLDOWN_MS - (Instant.now().toEpochMilli() - lastFedTime);
-        return Math.max(0, remaining);
+        return Math.max(0, FEED_COOLDOWN_MS - (Instant.now().toEpochMilli() - lastFedTime));
     }
 
     private String formatCooldown(long ms) {
-        long totalSeconds = ms / 1000;
-        long minutes      = totalSeconds / 60;
-        long seconds      = totalSeconds % 60;
+        long total   = ms / 1000;
+        long minutes = total / 60;
+        long seconds = total % 60;
         return String.format("%02d:%02d", minutes, seconds);
     }
 
-    /** Called every second by cooldownTimer to update the feed button text and state. */
     private void refreshFeedButton() {
         if (feedButton == null) return;
-
         if (isFeedOnCooldown()) {
             feedButton.setText("🍖 " + formatCooldown(feedCooldownRemainingMs()));
             feedButton.setEnabled(false);
@@ -92,7 +88,7 @@ public class PetMenu {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(Theme.BG_MAIN_TRANSPARENT);
+                g2.setColor(Theme.BG_MAIN);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), Theme.CORNER_RADIUS, Theme.CORNER_RADIUS);
                 g2.dispose();
             }
@@ -105,15 +101,15 @@ public class PetMenu {
         header.setOpaque(false);
         header.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
 
-        JLabel title = new JLabel("🐱 " + stats.getName());
+        JLabel title = Theme.mixedLabel("🐱 " + stats.getName(), 15, Theme.TEXT_PRIMARY);
         title.setForeground(Theme.TEXT_PRIMARY);
-        title.setFont(Theme.font(15));
+        title.setFont(Theme.emojiFont(15)); // ← emoji font
 
-        mainMenuCoinLabel = new JLabel("🪙 " + stats.getCoins());
+        mainMenuCoinLabel = Theme.mixedLabel("🪙 " + stats.getCoins(), Theme.FONT_SIZE_LABEL, Theme.ACCENT_COINS);
         mainMenuCoinLabel.setForeground(Theme.ACCENT_COINS);
-        mainMenuCoinLabel.setFont(Theme.font(Theme.FONT_SIZE_LABEL));
+        mainMenuCoinLabel.setFont(Theme.emojiFont(Theme.FONT_SIZE_LABEL)); // ← emoji font
 
-        header.add(title, BorderLayout.WEST);
+        header.add(title,             BorderLayout.WEST);
         header.add(mainMenuCoinLabel, BorderLayout.EAST);
         wrapper.add(header, BorderLayout.NORTH);
 
@@ -134,28 +130,24 @@ public class PetMenu {
         content.add(wrapBar(happinessLabel, happinessBar)); content.add(Box.createVerticalStrut(8));
         content.add(wrapBar(energyLabel,    energyBar));    content.add(Box.createVerticalStrut(15));
 
-        // ── Feed button with cooldown ───────────────────────────
+        // Feed button with cooldown
         feedButton = makeButton("🍖 Feed", () -> {
-            if (isFeedOnCooldown()) return; // Safety guard
-
+            if (isFeedOnCooldown()) return;
             stats.addHunger(20);
             stats.addHappiness(5);
             stats.addCoins(5);
             updateLiveStats();
             save();
-
-            // Start the cooldown
             lastFedTime = Instant.now().toEpochMilli();
             refreshFeedButton();
         });
         content.add(feedButton);
         content.add(Box.createVerticalStrut(5));
-
-        // Initialise button state in case cooldown was already active
         refreshFeedButton();
 
         addButton(content, "🎾 Play", () -> {
-            stats.addHappiness(20); stats.addEnergy(-10); stats.addHunger(-10); stats.addCoins(5);
+            stats.addHappiness(20); stats.addEnergy(-10);
+            stats.addHunger(-10);  stats.addCoins(5);
             updateLiveStats(); save(); openRandomGrass();
         });
 
@@ -163,13 +155,15 @@ public class PetMenu {
             stats.addEnergy(10); updateLiveStats(); save();
         });
 
-        addButton(content, "🛒 Shop",     this::openShopWindow);
-        addButton(content, "⚙️ Settings", () -> {
+        addButton(content, "🛒 Shop", this::openShopWindow);
+
+        addButton(content, "⚙️Settings", () -> {
             SettingsDialog settings = new SettingsDialog(stats);
             settings.setVisible(true);
         });
-        addButton(content, "👁 Hide",     () -> PetTray.hide(dialog));
-        addButton(content, "❌ Exit",     () -> { save(); PetTray.remove(); System.exit(0); });
+
+        addButton(content, "👁 Hide",  () -> PetTray.hide(dialog));
+        addButton(content, "❌ Exit",  () -> { save(); PetTray.remove(); System.exit(0); });
 
         // Scroll pane
         JScrollPane scrollPane = new JScrollPane(content);
@@ -211,7 +205,7 @@ public class PetMenu {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(Theme.BG_MAIN_TRANSPARENT);
+                g2.setColor(Theme.BG_MAIN);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), Theme.CORNER_RADIUS, Theme.CORNER_RADIUS);
                 g2.dispose();
             }
@@ -224,15 +218,15 @@ public class PetMenu {
         header.setOpaque(false);
         header.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
 
-        JLabel title = new JLabel("🛒 Accessory Shop");
+        JLabel title = Theme.mixedLabel("🛒 Accessory Shop", Theme.FONT_SIZE_HEADING, Theme.TEXT_PRIMARY);
         title.setForeground(Theme.TEXT_PRIMARY);
-        title.setFont(Theme.font(Theme.FONT_SIZE_HEADING));
+        title.setFont(Theme.emojiFont(Theme.FONT_SIZE_HEADING)); // ← emoji font
 
-        JLabel shopCoinLabel = new JLabel("🪙 " + stats.getCoins());
+        JLabel shopCoinLabel = Theme.mixedLabel("🪙 " + stats.getCoins(), Theme.FONT_SIZE_LABEL, Theme.ACCENT_COINS);
         shopCoinLabel.setForeground(Theme.ACCENT_COINS);
-        shopCoinLabel.setFont(Theme.font(Theme.FONT_SIZE_LABEL));
+        shopCoinLabel.setFont(Theme.emojiFont(Theme.FONT_SIZE_LABEL)); // ← emoji font
 
-        JButton closeBtn = makeButton("X", shopDialog::dispose);
+        JButton closeBtn = makeButton("✖", shopDialog::dispose);
         closeBtn.setBackground(Theme.BTN_CLOSE);
         closeBtn.setPreferredSize(new Dimension(40, 30));
 
@@ -249,7 +243,9 @@ public class PetMenu {
             @Override public void mouseDragged(java.awt.event.MouseEvent e) {
                 if (offset[0] == null) return;
                 Point loc = shopDialog.getLocation();
-                shopDialog.setLocation(loc.x + e.getX() - offset[0].x, loc.y + e.getY() - offset[0].y);
+                shopDialog.setLocation(
+                        loc.x + e.getX() - offset[0].x,
+                        loc.y + e.getY() - offset[0].y);
             }
         });
 
@@ -291,22 +287,23 @@ public class PetMenu {
         ));
 
         JLabel iconLabel = new JLabel(icon, SwingConstants.CENTER);
-        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 40));
+        iconLabel.setFont(Theme.emojiFont(40)); // ← emoji font
         iconLabel.setForeground(Theme.TEXT_PRIMARY);
 
         JButton buyBtn = makeButton("", null);
-        buyBtn.setFont(Theme.font(Theme.FONT_SIZE_BODY));
 
         if (stats.ownsAccessory(itemId)) {
             buyBtn.setText("Owned");
             buyBtn.setBackground(Theme.BG_SHOP_OWNED);
             buyBtn.setEnabled(false);
         } else {
-            buyBtn.setText(price + " 🪙");
+            buyBtn.setText(price + "");
             buyBtn.setBackground(Theme.BG_SHOP_BUY);
             buyBtn.addActionListener(e -> {
                 if (stats.getCoins() >= price) {
-                    stats.addCoins(-price); stats.addAccessory(itemId); save();
+                    stats.addCoins(-price);
+                    stats.addAccessory(itemId);
+                    save();
                     shopCoinLabel.setText("🪙 " + stats.getCoins());
                     mainMenuCoinLabel.setText("🪙 " + stats.getCoins());
                     buyBtn.setText("Owned");
@@ -321,7 +318,7 @@ public class PetMenu {
         }
 
         slot.add(iconLabel, BorderLayout.CENTER);
-        slot.add(buyBtn, BorderLayout.SOUTH);
+        slot.add(buyBtn,    BorderLayout.SOUTH);
         return slot;
     }
 
@@ -351,7 +348,7 @@ public class PetMenu {
 
         JLabel title = new JLabel("📊 Stats");
         title.setForeground(Theme.TEXT_PRIMARY);
-        title.setFont(Theme.font(Theme.FONT_SIZE_HEADING));
+        title.setFont(Theme.emojiFont(Theme.FONT_SIZE_HEADING)); // ← emoji font
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
         p.add(title);
         p.add(Box.createVerticalStrut(10));
@@ -362,7 +359,7 @@ public class PetMenu {
 
         JLabel coins = new JLabel("🪙 Coins: " + stats.getCoins());
         coins.setForeground(Theme.ACCENT_COINS);
-        coins.setFont(Theme.font(Theme.FONT_SIZE_SMALL));
+        coins.setFont(Theme.emojiFont(Theme.FONT_SIZE_SMALL)); // ← emoji font
         coins.setAlignmentX(Component.CENTER_ALIGNMENT);
         p.add(coins);
         p.add(Box.createVerticalStrut(10));
@@ -378,7 +375,7 @@ public class PetMenu {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(Theme.BG_MAIN_TRANSPARENT);
+                g2.setColor(Theme.BG_MAIN);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), Theme.CORNER_RADIUS, Theme.CORNER_RADIUS);
                 g2.dispose();
             }
@@ -390,25 +387,20 @@ public class PetMenu {
     }
 
     private JLabel styledLabel(String text) {
-        JLabel l = new JLabel(text);
-        l.setForeground(Theme.TEXT_PRIMARY);
-        l.setFont(Theme.font(Theme.FONT_SIZE_LABEL));
-        return l;
+        return Theme.mixedLabel(text, Theme.FONT_SIZE_LABEL, Theme.TEXT_PRIMARY);
     }
 
     private JProgressBar makeProgressBar(int value) {
         JProgressBar bar = new JProgressBar(0, 100) {
-            @Override
-            public void updateUI() {
+            @Override public void updateUI() {
                 setUI(new javax.swing.plaf.basic.BasicProgressBarUI() {
-                    @Override
-                    protected void paintDeterminate(Graphics g, JComponent c) {
-                        int width  = (int)(c.getWidth() * ((double) ((JProgressBar) c).getValue() / ((JProgressBar) c).getMaximum()));
-                        int height = c.getHeight();
+                    @Override protected void paintDeterminate(Graphics g, JComponent c) {
+                        int w = (int)(c.getWidth() * ((double)((JProgressBar)c).getValue() / ((JProgressBar)c).getMaximum()));
+                        int h = c.getHeight();
                         g.setColor(Theme.PROGRESS_TRACK);
-                        g.fillRect(0, 0, c.getWidth(), height);
+                        g.fillRect(0, 0, c.getWidth(), h);
                         g.setColor(c.getForeground());
-                        g.fillRect(0, 0, width, height);
+                        g.fillRect(0, 0, w, h);
                     }
                 });
             }
@@ -443,7 +435,8 @@ public class PetMenu {
         JButton btn = new JButton(text) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,      RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
                 Color bg = getBackground();
                 if (!isEnabled())                 bg = Theme.BTN_DISABLED;
@@ -453,12 +446,20 @@ public class PetMenu {
                 g2.setColor(bg);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(),
                         Theme.BUTTON_CORNER_RADIUS, Theme.BUTTON_CORNER_RADIUS + 1);
+
                 g2.setColor(isEnabled() ? Theme.TEXT_PRIMARY : Theme.TEXT_DISABLED);
+
+                // Measure the mixed string width to center it
+                int textWidth = Theme.mixedStringWidth(g2, getText(), Theme.FONT_SIZE_BUTTON);
+                // Use custom font metrics for vertical centering
                 g2.setFont(Theme.font(Theme.FONT_SIZE_BUTTON));
                 FontMetrics fm = g2.getFontMetrics();
-                g2.drawString(getText(),
-                        (getWidth()  - fm.stringWidth(getText())) / 2,
-                        (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
+                int x = (getWidth()  - textWidth) / 2;
+                int y = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
+
+                // Draw with mixed fonts
+                Theme.drawMixedString(g2, getText(), x, y, Theme.FONT_SIZE_BUTTON);
+
                 g2.dispose();
             }
         };
