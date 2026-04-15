@@ -115,12 +115,14 @@ public class PetPanel extends JPanel {
     private void toggleMenu() {
         menuVisible = !menuVisible;
         if (menuVisible) {
-            menuToggleButton.setText("✕");
+            menuToggleButton.setFont(Theme.emojiFont(40));
+            menuToggleButton.setText("❌");
             dialog.setSize(Main.PET_WIDTH + Theme.MENU_WIDTH, Main.PET_HEIGHT);
             dialog.setLocation(dialog.getX() - Theme.MENU_WIDTH, dialog.getY());
             dialog.add(menu.getPanel(), BorderLayout.WEST);
         } else {
-            menuToggleButton.setText("☰");
+            menuToggleButton.setFont(Theme.emojiFont(40));
+            menuToggleButton.setText("🤍");
             dialog.remove(menu.getPanel());
             dialog.setSize(Main.PET_WIDTH, Main.PET_HEIGHT);
             dialog.setLocation(dialog.getX() + Theme.MENU_WIDTH, dialog.getY());
@@ -130,10 +132,13 @@ public class PetPanel extends JPanel {
     }
 
     private JButton buildToggleButton() {
-        JButton btn = new JButton("☰") {
+        JButton btn = new JButton("🤍") {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,  RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+                // Background
                 Color bg = getModel().isPressed()  ? new Color(60, 60, 60, 220)
                         : getModel().isRollover() ? new Color(80, 80, 80, 220)
                         :                           new Color(50, 50, 50, 200);
@@ -141,8 +146,10 @@ public class PetPanel extends JPanel {
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
                 g2.setColor(new Color(100, 100, 100));
                 g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+
+                // Use emoji font for drawing the text
                 g2.setColor(Color.WHITE);
-                g2.setFont(new Font("Arial", Font.BOLD, 16));
+                g2.setFont(Theme.emojiFont(16)); // ← emoji font here instead of Arial
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(getText(),
                         (getWidth()  - fm.stringWidth(getText())) / 2,

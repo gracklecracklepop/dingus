@@ -1,10 +1,8 @@
-import com.sun.management.OperatingSystemMXBean;
-
 import javax.swing.*;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import java.awt.*;
 import java.awt.Desktop;
-import java.lang.management.ManagementFactory;
+import java.time.Instant;
 
 public class PetMenu {
 
@@ -19,7 +17,11 @@ public class PetMenu {
     private JLabel hungerLabel, happinessLabel, energyLabel;
     private JLabel mainMenuCoinLabel;
 
-    private javax.swing.Timer usageTimer;
+    // ── Cooldown tracking ───────────────────────────────────────
+    private static final long FEED_COOLDOWN_MS   = 15 * 60 * 1000L; // 30 minutes in ms
+    private long lastFedTime = 0L; // Epoch ms of last feed. 0 = never fed
+    private JButton feedButton; // Reference so we can update its label live
+    private Timer cooldownTimer; // Ticks every second to update the button label
 
     private static final String[] GRASS_URLS = {
             "https://www.thisoldhouse.com/wp-content/uploads/2020/08/iStock_511747120-scaled.jpg",
@@ -41,32 +43,46 @@ public class PetMenu {
         container.add(statsPanel, "stats");
 
         this.panel = container;
+
+        // Start the cooldown ticker so the button label updates every second
+        cooldownTimer = new Timer(1000, e -> refreshFeedButton());
+        cooldownTimer.start();
     }
 
     public JPanel getPanel() { return panel; }
 
-    // ── Usage Timer ─────────────────────────────────────────────
+    // ── Cooldown Helpers ────────────────────────────────────────
 
-    public void startUsageTimer() {
-        if (usageTimer != null) usageTimer.stop();
-        usageTimer = new javax.swing.Timer(1000, e -> usageAdd());
-        usageTimer.start();
+    private boolean isFeedOnCooldown() {
+        return (Instant.now().toEpochMilli() - lastFedTime) < FEED_COOLDOWN_MS;
     }
 
-    public void stopUsageTimer() {
-        if (usageTimer != null) {
-            usageTimer.stop();
-            usageTimer = null;
+    private long feedCooldownRemainingMs() {
+        long remaining = FEED_COOLDOWN_MS - (Instant.now().toEpochMilli() - lastFedTime);
+        return Math.max(0, remaining);
+    }
+
+    private String formatCooldown(long ms) {
+        long totalSeconds = ms / 1000;
+        long minutes      = totalSeconds / 60;
+        long seconds      = totalSeconds % 60;
+        return String.format("%02d:%02d", minutes, seconds);
+    }
+
+    /** Called every second by cooldownTimer to update the feed button text and state. */
+    private void refreshFeedButton() {
+        if (feedButton == null) return;
+
+        if (isFeedOnCooldown()) {
+            feedButton.setText("🍖 " + formatCooldown(feedCooldownRemainingMs()));
+            feedButton.setEnabled(false);
+            feedButton.setBackground(Theme.BTN_DISABLED);
+        } else {
+            feedButton.setText("🍖 Feed");
+            feedButton.setEnabled(true);
+            feedButton.setBackground(Theme.BTN_DEFAULT);
         }
-    }
-
-    public void usageAdd() {
-        OperatingSystemMXBean osBean = (OperatingSystemMXBean)
-                ManagementFactory.getOperatingSystemMXBean();
-            //ramUsage.runLiveMode(osBean);
-            long baseRam = PetStats.getBaseRam();
-            stats.addHunger(1);
-            updateLiveStats();
+        feedButton.repaint();
     }
 
     // ── Main Menu ───────────────────────────────────────────────
@@ -118,10 +134,25 @@ public class PetMenu {
         content.add(wrapBar(happinessLabel, happinessBar)); content.add(Box.createVerticalStrut(8));
         content.add(wrapBar(energyLabel,    energyBar));    content.add(Box.createVerticalStrut(15));
 
-        addButton(content, "🍖 Feed", () -> {
-            stats.addHunger(20); stats.addHappiness(5); stats.addCoins(5);
-            updateLiveStats(); save();
+        // ── Feed button with cooldown ───────────────────────────
+        feedButton = makeButton("🍖 Feed", () -> {
+            if (isFeedOnCooldown()) return; // Safety guard
+
+            stats.addHunger(20);
+            stats.addHappiness(5);
+            stats.addCoins(5);
+            updateLiveStats();
+            save();
+
+            // Start the cooldown
+            lastFedTime = Instant.now().toEpochMilli();
+            refreshFeedButton();
         });
+        content.add(feedButton);
+        content.add(Box.createVerticalStrut(5));
+
+        // Initialise button state in case cooldown was already active
+        refreshFeedButton();
 
         addButton(content, "🎾 Play", () -> {
             stats.addHappiness(20); stats.addEnergy(-10); stats.addHunger(-10); stats.addCoins(5);
@@ -133,9 +164,12 @@ public class PetMenu {
         });
 
         addButton(content, "🛒 Shop",     this::openShopWindow);
-        addButton(content, "⚙️ Settings", () -> System.out.println("Opening settings!"));
+        addButton(content, "⚙️ Settings", () -> {
+            SettingsDialog settings = new SettingsDialog(stats);
+            settings.setVisible(true);
+        });
         addButton(content, "👁 Hide",     () -> PetTray.hide(dialog));
-        addButton(content, "❌ Exit",     () -> { stopUsageTimer(); save(); PetTray.remove(); System.exit(0); });
+        addButton(content, "❌ Exit",     () -> { save(); PetTray.remove(); System.exit(0); });
 
         // Scroll pane
         JScrollPane scrollPane = new JScrollPane(content);
@@ -371,10 +405,8 @@ public class PetMenu {
                     protected void paintDeterminate(Graphics g, JComponent c) {
                         int width  = (int)(c.getWidth() * ((double) ((JProgressBar) c).getValue() / ((JProgressBar) c).getMaximum()));
                         int height = c.getHeight();
-
                         g.setColor(Theme.PROGRESS_TRACK);
                         g.fillRect(0, 0, c.getWidth(), height);
-
                         g.setColor(c.getForeground());
                         g.fillRect(0, 0, width, height);
                     }
@@ -414,7 +446,7 @@ public class PetMenu {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
                 Color bg = getBackground();
-                if (!isEnabled())                bg = Theme.BTN_DISABLED;
+                if (!isEnabled())                 bg = Theme.BTN_DISABLED;
                 else if (getModel().isPressed())  bg = Theme.BTN_PRESSED;
                 else if (getModel().isRollover()) bg = Theme.BTN_HOVER;
 

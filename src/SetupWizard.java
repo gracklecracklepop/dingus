@@ -55,10 +55,18 @@ public class SetupWizard extends JDialog {
         mainContainer.add(buildHeader(), BorderLayout.NORTH);
 
         cardPanel.setOpaque(false);
-        cardPanel.add(buildIntroCard(), "intro");
-        cardPanel.add(buildRamCheckCard(), "ram");
-        cardPanel.add(buildCpuCheckCard(), "cpu");
-        cardPanel.add(buildCustomizationCard(), "custom");
+        cardPanel.add(buildIntroCard(),        "intro");
+        cardPanel.add(buildRamCheckCard(),     "ram");
+        cardPanel.add(buildCpuCheckCard(),     "cpu");
+        cardPanel.add(buildCustomizationCard(),"custom");
+
+        // Guide card — shown after customization, before the game starts
+        GuidePanel guidePanel = new GuidePanel(() -> {
+            // "Back" in the guide goes back to customization in the wizard
+            cardLayout.show(cardPanel, "custom");
+        });
+        // Wrap guide in a panel with a "Start Game" button at the bottom
+        cardPanel.add(buildGuideWizardCard(guidePanel), "guide");
 
         mainContainer.add(cardPanel, BorderLayout.CENTER);
         add(mainContainer);
@@ -230,18 +238,21 @@ public class SetupWizard extends JDialog {
                 if (isCancelled()) return;
                 Object[] l = chunks.get(chunks.size() - 1);
                 ramProgressBar.setValue((Integer) l[0]);
-                ramLiveStats.setText(String.format("Used: %.2f GB / %.2f GB (%.1f%%)", (Long)l[2]/1e9, (Long)l[3]/1e9, (Double)l[1]));
+                ramLiveStats.setText(String.format("Used: %.2f GB / %.2f GB (%.1f%%)",
+                        (Long)l[2]/1e9, (Long)l[3]/1e9, (Double)l[1]));
             }
             @Override protected void done() {
                 if (isCancelled()) return;
                 try {
                     long avg = get(); newStats.setBaseRam(avg / (1024 * 1024));
                     ramProgressBar.setValue(100);
-                    ramTitle.setText("RAM Baseline Complete!"); ramTitle.setForeground(Theme.ACCENT_SUCCESS);
+                    ramTitle.setText("RAM Baseline Complete!");
+                    ramTitle.setForeground(Theme.ACCENT_SUCCESS);
                     ramLiveStats.setText(String.format("Average Baseline RAM: %.2f GB", avg / 1e9));
                     ramNextBtn.setEnabled(true); ramSkipBtn.setVisible(false);
                 } catch (Exception e) {
-                    ramLiveStats.setText("Error measuring RAM."); ramLiveStats.setForeground(Theme.ACCENT_ERROR);
+                    ramLiveStats.setText("Error measuring RAM.");
+                    ramLiveStats.setForeground(Theme.ACCENT_ERROR);
                     ramNextBtn.setEnabled(true);
                 }
             }
@@ -331,18 +342,21 @@ public class SetupWizard extends JDialog {
                 if (isCancelled()) return;
                 Object[] l = chunks.get(chunks.size() - 1);
                 cpuProgressBar.setValue((Integer) l[0]);
-                cpuLiveStats.setText(String.format("%s %.1f%% (%d cores)", generateBar((Double)l[1]), (Double)l[1], (Integer)l[2]));
+                cpuLiveStats.setText(String.format("%s %.1f%% (%d cores)",
+                        generateBar((Double)l[1]), (Double)l[1], (Integer)l[2]));
             }
             @Override protected void done() {
                 if (isCancelled()) return;
                 try {
                     double avg = get(); newStats.setBaseCpu(avg);
                     cpuProgressBar.setValue(100);
-                    cpuTitle.setText("CPU Baseline Complete!"); cpuTitle.setForeground(Theme.ACCENT_SUCCESS);
+                    cpuTitle.setText("CPU Baseline Complete!");
+                    cpuTitle.setForeground(Theme.ACCENT_SUCCESS);
                     cpuLiveStats.setText(String.format("Average Baseline CPU: %.1f%%", avg));
                     cpuNextBtn.setEnabled(true); cpuSkipBtn.setVisible(false);
                 } catch (Exception e) {
-                    cpuLiveStats.setText("Error measuring CPU."); cpuLiveStats.setForeground(Theme.ACCENT_ERROR);
+                    cpuLiveStats.setText("Error measuring CPU.");
+                    cpuLiveStats.setForeground(Theme.ACCENT_ERROR);
                     cpuNextBtn.setEnabled(true);
                 }
             }
@@ -358,7 +372,7 @@ public class SetupWizard extends JDialog {
     // ── Step 4: Customization ───────────────────────────────────
 
     private JPanel buildCustomizationCard() {
-        JPanel p = new JPanel(new GridLayout(5, 2, 10, 15));
+        JPanel p = new JPanel(new GridLayout(6, 2, 10, 15));
         p.setOpaque(false);
         p.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
@@ -371,10 +385,14 @@ public class SetupWizard extends JDialog {
                 "Default (Orange)", "Void (Black)", "Ghost (White)"
         });
 
-        p.add(styledLabel("Pet Name:"));  p.add(nameField);
-        p.add(styledLabel("Gender:"));    p.add(genderBox);
+        p.add(styledLabel("Pet Name:"));     p.add(nameField);
+        p.add(styledLabel("Gender:"));       p.add(genderBox);
         p.add(styledLabel("Sprite Color:")); p.add(colorBox);
-        p.add(new JLabel()); p.add(new JLabel());
+        p.add(new JLabel());                 p.add(new JLabel());
+
+        JButton guideBtn = makeButton("📖 How to Play", () ->
+                cardLayout.show(cardPanel, "guide"));
+        guideBtn.setBackground(Theme.BTN_SECONDARY);
 
         JButton finishBtn = makeButton("Start Game!", () -> {
             newStats.setName(nameField.getText());
@@ -386,9 +404,18 @@ public class SetupWizard extends JDialog {
         });
         finishBtn.setBackground(Theme.BTN_PRIMARY);
 
-        p.add(new JLabel());
+        p.add(guideBtn);
         p.add(finishBtn);
         return p;
+    }
+
+    // ── Step 5: Guide (wraps GuidePanel with a finish button) ───
+
+    private JPanel buildGuideWizardCard(GuidePanel guidePanel) {
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setOpaque(false);
+        wrapper.add(guidePanel, BorderLayout.CENTER);
+        return wrapper;
     }
 
     // ── Styling Helpers ─────────────────────────────────────────
@@ -457,7 +484,8 @@ public class SetupWizard extends JDialog {
             @Override protected JTextField createEditorComponent() {
                 JTextField editor = new JTextField() {
                     @Override protected void paintComponent(Graphics g) {
-                        g.setColor(Theme.BG_INPUT); g.fillRect(0, 0, getWidth(), getHeight());
+                        g.setColor(Theme.BG_INPUT);
+                        g.fillRect(0, 0, getWidth(), getHeight());
                         super.paintComponent(g);
                     }
                 };
@@ -474,13 +502,14 @@ public class SetupWizard extends JDialog {
         cb.setRenderer(new DefaultListCellRenderer() {
             @Override public Component getListCellRendererComponent(JList<?> list, Object value,
                                                                     int index, boolean isSelected, boolean cellHasFocus) {
-                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                JLabel label = (JLabel) super.getListCellRendererComponent(
+                        list, value, index, isSelected, cellHasFocus);
                 label.setFont(Theme.font(Theme.FONT_SIZE_BODY));
                 label.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
                 label.setOpaque(true);
-                if (index == -1)       { label.setBackground(Theme.BG_INPUT);             label.setForeground(Theme.TEXT_PRIMARY); }
-                else if (isSelected)   { label.setBackground(Theme.BG_DROPDOWN_SELECTED); label.setForeground(Theme.TEXT_PRIMARY); }
-                else                   { label.setBackground(Theme.BG_DROPDOWN_ITEM);     label.setForeground(Theme.TEXT_PRIMARY); }
+                if (index == -1)             { label.setBackground(Theme.BG_INPUT);             label.setForeground(Theme.TEXT_PRIMARY); }
+                else if (isSelected)         { label.setBackground(Theme.BG_DROPDOWN_SELECTED); label.setForeground(Theme.TEXT_PRIMARY); }
+                else                         { label.setBackground(Theme.BG_DROPDOWN_ITEM);     label.setForeground(Theme.TEXT_PRIMARY); }
                 return label;
             }
         });
@@ -494,7 +523,7 @@ public class SetupWizard extends JDialog {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 Color bg = getBackground();
-                if (!isEnabled())              bg = Theme.BTN_DISABLED;
+                if (!isEnabled())                 bg = Theme.BTN_DISABLED;
                 else if (getModel().isPressed())  bg = bg.darker();
                 else if (getModel().isRollover()) bg = bg.brighter();
                 g2.setColor(bg);

@@ -87,6 +87,10 @@ public class Theme {
     public static final int FONT_SIZE_LABEL        = 12;
     public static final int FONT_SIZE_BODY         = 12;
     public static final int FONT_SIZE_SMALL        = 10;
+    public static final String EMOJI_FONT = "Segoe UI Emoji";
+    public static Font emojiFont(int size) {
+        return new Font(EMOJI_FONT, Font.PLAIN, size);
+    }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // ██████████████████████████  SIZING  ██████████████████████████████████████
