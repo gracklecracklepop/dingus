@@ -3,7 +3,7 @@ import java.util.Set;
 
 public class PetStats {
 
-    public int hunger = 67;
+    public int hunger = 100;
     public int happiness = 100;
     public int energy = 100;
     public int coins = 0;
@@ -12,7 +12,7 @@ public class PetStats {
     private String name = "Dingus";
     private String gender = "Robot";
     private String spriteColor = "Default (Orange)";
-    private static long baseRam = 0;
+    private long baseRam = 0;
     private double baseCpu = 0; // NEW: CPU baseline percentage
 
     // --- INVENTORY ---
@@ -37,7 +37,7 @@ public class PetStats {
     public String getSpriteColor() { return spriteColor; }
     public void setSpriteColor(String spriteColor) { this.spriteColor = spriteColor; }
 
-    public static long getBaseRam() { return baseRam; }
+    public long getBaseRam() { return baseRam; }
     public void setBaseRam(long baseRam) { this.baseRam = baseRam; }
 
     public double getBaseCpu() { return baseCpu; }

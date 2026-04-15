@@ -20,18 +20,15 @@ public class Main {
             // --- WIZARD CHECK ---
             if (!SaveManager.saveExists()) {
                 SetupWizard wizard = new SetupWizard();
-                wizard.setVisible(true); // Blocks thread until wizard is closed
+                wizard.setVisible(true);
 
-                // If user closed the wizard using the 'X' button without finishing
                 if (!wizard.isFinished()) {
                     System.exit(0);
                 }
 
-                // Save the newly generated stats from the wizard
                 SaveManager.save(wizard.getGeneratedStats());
             }
 
-            // Now load stats (guaranteed to exist now)
             PetStats currentStats = SaveManager.load();
 
             // Utility owner frame keeps the app off the taskbar
@@ -49,8 +46,6 @@ public class Main {
                     icon.getScaledInstance(128, 128, Image.SCALE_SMOOTH)
             ));
 
-            // --- RESTORED PET UI CREATION ---
-
             // Bed window — shown first so it sits behind the pet
             BedDialog bed = new BedDialog(hiddenOwner);
             bed.positionAtBottom();
@@ -65,51 +60,61 @@ public class Main {
             dialog.setAlwaysOnTop(true);
             dialog.setResizable(false);
 
-            Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
-            dialog.setLocation(screen.width - PET_WIDTH, screen.height - PET_HEIGHT - 45);
-
-            // Pass the stats to the panel if you've updated it to accept them.
-            // If PetPanel doesn't take stats in its constructor, just leave it as new PetPanel(dialog);
             PetPanel panel = new PetPanel(dialog);
             panel.setOpaque(false);
-
-            // Give PetPanel a reference to BedDialog so it can do overlap detection
-            panel.setBedDialog(bed);
 
             dialog.add(panel, BorderLayout.CENTER);
 
             PetTray.setup(dialog, bed, icon);
             attachDragListener(panel, dialog);
 
-            // Pet dialog shown after bed — naturally renders on top
+            // Show dialog first
             dialog.setVisible(true);
+
+            // After visible: snap cat to bed and link bed reference
+            SwingUtilities.invokeLater(() -> {
+                Point snapPos = BedDialog.getCatSnapPosition();
+                dialog.setLocation(snapPos.x, snapPos.y);
+                panel.setBedDialog(bed);
+            });
         });
     }
 
     private static void attachDragListener(PetPanel panel, JDialog dialog) {
-        final Point[] offset   = {null};
-        final boolean[] active = {false};
+        final Point[] dragOffset = {null};
+        final boolean[] active   = {false};
 
         panel.addMouseListener(new MouseAdapter() {
-            @Override public void mousePressed(MouseEvent e) {
+            @Override
+            public void mousePressed(MouseEvent e) {
                 if (panel.isOverMenuButton(e.getPoint())) return;
-                offset[0] = e.getPoint();
+
+                // Pin the drag to the top-left corner of the image
+                // so the mouse always holds from the corner
+                dragOffset[0] = new Point(Main.PET_WIDTH, 0);
+
                 active[0] = true;
                 panel.setDragging(true);
             }
-            @Override public void mouseReleased(MouseEvent e) {
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
                 if (!active[0]) return;
                 active[0] = false;
-                panel.setDragging(false); // triggers bed check inside PetPanel
+                panel.setDragging(false);
             }
         });
 
         panel.addMouseMotionListener(new MouseMotionAdapter() {
-            @Override public void mouseDragged(MouseEvent e) {
-                if (!active[0] || offset[0] == null) return;
-                Point loc = dialog.getLocation();
-                dialog.setLocation(loc.x + e.getX() - offset[0].x,
-                        loc.y + e.getY() - offset[0].y);
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                if (!active[0] || dragOffset[0] == null) return;
+
+                // Dialog top-left follows the mouse exactly
+                int newX = e.getXOnScreen() - dragOffset[0].x;
+                int newY = e.getYOnScreen() - dragOffset[0].y;
+
+                dialog.setLocation(newX, newY);
             }
         });
     }

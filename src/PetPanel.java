@@ -5,7 +5,6 @@ import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import com.sun.management.OperatingSystemMXBean;
 
 public class PetPanel extends JPanel {
 
@@ -43,7 +42,6 @@ public class PetPanel extends JPanel {
 
         PetStats stats = SaveManager.load();
         menu = new PetMenu(stats, dialog);
-        menu.startUsageTimer();
 
         menuToggleButton = buildToggleButton();
         menuToggleButton.setBounds(5, 5, BUTTON_SIZE, BUTTON_SIZE);
@@ -116,13 +114,13 @@ public class PetPanel extends JPanel {
         menuVisible = !menuVisible;
         if (menuVisible) {
             menuToggleButton.setFont(Theme.emojiFont(40));
-            menuToggleButton.setText("❌");
+            menuToggleButton.setText("🤍");
             dialog.setSize(Main.PET_WIDTH + Theme.MENU_WIDTH, Main.PET_HEIGHT);
             dialog.setLocation(dialog.getX() - Theme.MENU_WIDTH, dialog.getY());
             dialog.add(menu.getPanel(), BorderLayout.WEST);
         } else {
             menuToggleButton.setFont(Theme.emojiFont(40));
-            menuToggleButton.setText("🤍");
+            menuToggleButton.setText("❌");
             dialog.remove(menu.getPanel());
             dialog.setSize(Main.PET_WIDTH, Main.PET_HEIGHT);
             dialog.setLocation(dialog.getX() + Theme.MENU_WIDTH, dialog.getY());

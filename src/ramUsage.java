@@ -1,5 +1,5 @@
 import com.sun.management.OperatingSystemMXBean;
-
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,7 +58,7 @@ public class ramUsage {
         printSummary(usageSamples);
     }
 
-    static void runLiveMode(OperatingSystemMXBean osBean)
+    private static void runLiveMode(OperatingSystemMXBean osBean)
             throws InterruptedException {
 
         System.out.println("=== Live System RAM Utilization (Ctrl+C to stop) ===");
