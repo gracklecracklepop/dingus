@@ -61,7 +61,8 @@ public class PetMenu {
 
     public void usageAdd() throws InterruptedException {
         ramUse= ramUsage.runLiveMode((com.sun.management.OperatingSystemMXBean) osBean);
-        System.out.println(ramUse - base);
+        System.out.println(((double)(ramUse - base))/100000);
+        System.out.println((ramUse - base));
         stats.addHunger(1);
         updateLiveStats();
     }
