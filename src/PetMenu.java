@@ -1,4 +1,5 @@
 import javax.swing.*;
+import javax.swing.border.Border;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import java.awt.*;
 import java.awt.Desktop;
@@ -469,7 +470,11 @@ public class PetMenu {
         btn.setPreferredSize(new Dimension(Theme.MENU_WIDTH - 30, 40));
         btn.setMaximumSize(new Dimension(Theme.MENU_WIDTH - 20, 20));
         btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        btn.setBorderPainted(false);
+        btn.setBorderPainted(true);
+
+        Border blackline;
+        blackline = BorderFactory.createRaisedBevelBorder();
+        btn.setBorder(blackline);
         btn.setContentAreaFilled(false);
         btn.setFocusPainted(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
