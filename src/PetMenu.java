@@ -1,9 +1,10 @@
 import javax.swing.*;
-import javax.swing.border.Border;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import java.awt.*;
 import java.awt.Desktop;
 import java.time.Instant;
+
+import static javax.swing.BorderFactory.createBevelBorder;
 
 public class PetMenu {
 
@@ -90,7 +91,7 @@ public class PetMenu {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(Theme.BG_MAIN);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), Theme.CORNER_RADIUS, Theme.CORNER_RADIUS);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight() - 5, Theme.CORNER_RADIUS, Theme.CORNER_RADIUS);
                 g2.dispose();
             }
         };
@@ -103,19 +104,31 @@ public class PetMenu {
         header.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
 
         JLabel title = Theme.mixedLabel("🐱 " + stats.getName(), 15, Theme.TEXT_PRIMARY);
-        title.setForeground(Theme.TEXT_PRIMARY);
-        title.setFont(Theme.emojiFont(15)); // ← emoji font
-
         mainMenuCoinLabel = Theme.mixedLabel("🪙 " + stats.getCoins(), Theme.FONT_SIZE_LABEL, Theme.ACCENT_COINS);
-        mainMenuCoinLabel.setForeground(Theme.ACCENT_COINS);
-        mainMenuCoinLabel.setFont(Theme.emojiFont(Theme.FONT_SIZE_LABEL)); // ← emoji font
 
-        header.add(title,             BorderLayout.WEST);
+        header.add(title, BorderLayout.WEST);
         header.add(mainMenuCoinLabel, BorderLayout.EAST);
         wrapper.add(header, BorderLayout.NORTH);
 
         // Scrollable content
-        JPanel content = new JPanel();
+        // Custom preferred size so the scroll range stops exactly at the last component
+        JPanel content = new JPanel() {
+            @Override
+            public Dimension getPreferredSize() {
+                Insets in = getInsets();
+                int width = 0;
+                int height = in.top + in.bottom;
+
+                for (Component c : getComponents()) {
+                    if (!c.isVisible()) continue;
+                    Dimension pref = c.getPreferredSize();
+                    width = Math.max(width, pref.width);
+                    height += pref.height;
+                }
+
+                return new Dimension(width + in.left + in.right, height);
+            }
+        };
         content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
         content.setOpaque(false);
 
@@ -143,28 +156,37 @@ public class PetMenu {
             refreshFeedButton();
         });
         content.add(feedButton);
-        content.add(Box.createVerticalStrut(5));
         refreshFeedButton();
 
         addButton(content, "🎾 Play", () -> {
-            stats.addHappiness(20); stats.addEnergy(-10);
-            stats.addHunger(-10);  stats.addCoins(5);
-            updateLiveStats(); save(); openRandomGrass();
+            stats.addHappiness(20);
+            stats.addEnergy(-10);
+            stats.addHunger(-10);
+            stats.addCoins(5);
+            updateLiveStats();
+            save();
+            openRandomGrass();
         });
 
         addButton(content, "😴 Sleep", () -> {
-            stats.addEnergy(10); updateLiveStats(); save();
+            stats.addEnergy(10);
+            updateLiveStats();
+            save();
         });
 
         addButton(content, "🛒 Shop", this::openShopWindow);
 
-        addButton(content, "⚙️Settings", () -> {
+        addButton(content, "⚙ Settings", () -> {
             SettingsDialog settings = new SettingsDialog(stats);
             settings.setVisible(true);
         });
 
-        addButton(content, "👁 Hide",  () -> PetTray.hide(dialog));
-        addButton(content, "❌ Exit",  () -> { save(); PetTray.remove(); System.exit(0); });
+        addButton(content, "👁 Hide", () -> PetTray.hide(dialog));
+        addButton(content, "❌ Exit", () -> {
+            save();
+            PetTray.remove();
+            System.exit(0);
+        });
 
         // Scroll pane
         JScrollPane scrollPane = new JScrollPane(content);
@@ -172,11 +194,11 @@ public class PetMenu {
         scrollPane.getViewport().setOpaque(false);
         scrollPane.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
         scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        scrollPane.setPreferredSize(new Dimension(Theme.MENU_WIDTH, Theme.MENU_SCROLL_HEIGHT));
+        scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
 
         JScrollBar verticalBar = scrollPane.getVerticalScrollBar();
-        verticalBar.setPreferredSize(new Dimension(Theme.SCROLLBAR_WIDTH, 0));
-        verticalBar.setUnitIncrement(16);
+        verticalBar.setPreferredSize(new Dimension(Theme.SCROLLBAR_WIDTH - 2, 4));
+        verticalBar.setUnitIncrement(10);
         verticalBar.setUI(createThinScrollBarUI());
 
         wrapper.add(scrollPane, BorderLayout.CENTER);
@@ -426,13 +448,15 @@ public class PetMenu {
     private JPanel makeBar(String label, int value) {
         return wrapBar(styledLabel(label + ": " + value + "%"), makeProgressBar(value));
     }
-
     private void addButton(JPanel parent, String label, Runnable action) {
         parent.add(makeButton(label, action));
-        parent.add(Box.createVerticalStrut(5));
     }
 
     private JButton makeButton(String text, Runnable action) {
+        int btnHeight  = 22;
+        int btnSpacing = 6;
+        int totalHeight = btnHeight + btnSpacing;
+
         JButton btn = new JButton(text) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -444,21 +468,24 @@ public class PetMenu {
                 else if (getModel().isPressed())  bg = Theme.BTN_PRESSED;
                 else if (getModel().isRollover()) bg = Theme.BTN_HOVER;
 
+                // Draw button background only in the top portion (exclude spacing)
                 g2.setColor(bg);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(),
+                g2.fillRoundRect(0, 0, getWidth(), btnHeight,
+                        Theme.BUTTON_CORNER_RADIUS, Theme.BUTTON_CORNER_RADIUS + 1);
+
+                // Draw border accent around the button area only
+                g2.setColor(Theme.BTN_ACCENT);
+                g2.drawRoundRect(0, 0, getWidth() - 1, btnHeight - 1,
                         Theme.BUTTON_CORNER_RADIUS, Theme.BUTTON_CORNER_RADIUS + 1);
 
                 g2.setColor(isEnabled() ? Theme.TEXT_PRIMARY : Theme.TEXT_DISABLED);
 
-                // Measure the mixed string width to center it
                 int textWidth = Theme.mixedStringWidth(g2, getText(), Theme.FONT_SIZE_BUTTON);
-                // Use custom font metrics for vertical centering
                 g2.setFont(Theme.font(Theme.FONT_SIZE_BUTTON));
                 FontMetrics fm = g2.getFontMetrics();
                 int x = (getWidth()  - textWidth) / 2;
-                int y = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
+                int y = (btnHeight + fm.getAscent() - fm.getDescent()) / 2;
 
-                // Draw with mixed fonts
                 Theme.drawMixedString(g2, getText(), x, y, Theme.FONT_SIZE_BUTTON);
 
                 g2.dispose();
@@ -467,21 +494,17 @@ public class PetMenu {
 
         btn.setBackground(Theme.BTN_DEFAULT);
         btn.setForeground(Theme.TEXT_PRIMARY);
-        btn.setPreferredSize(new Dimension(Theme.MENU_WIDTH - 30, 40));
-        btn.setMaximumSize(new Dimension(Theme.MENU_WIDTH - 20, 20));
+        btn.setPreferredSize(new Dimension(Theme.MENU_WIDTH - 30, totalHeight));
+        btn.setMaximumSize(new Dimension(Theme.MENU_WIDTH - 20, totalHeight));
+        btn.setMinimumSize(new Dimension(Theme.MENU_WIDTH - 30, totalHeight));
         btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        btn.setBorderPainted(true);
-
-        Border blackline;
-        blackline = BorderFactory.createRaisedBevelBorder();
-        btn.setBorder(blackline);
+        btn.setBorderPainted(false);
         btn.setContentAreaFilled(false);
         btn.setFocusPainted(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         if (action != null) btn.addActionListener(e -> action.run());
         return btn;
     }
-
     private BasicScrollBarUI createThinScrollBarUI() {
         return new BasicScrollBarUI() {
             @Override protected void configureScrollBarColors() {
