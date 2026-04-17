@@ -58,12 +58,11 @@ public class ramUsage {
         printSummary(usageSamples);
     }
 
-    private static void runLiveMode(OperatingSystemMXBean osBean)
+    static void runLiveMode(OperatingSystemMXBean osBean)
             throws InterruptedException {
 
         System.out.println("=== Live System RAM Utilization (Ctrl+C to stop) ===");
 
-        while (true) {
             long totalRam = osBean.getTotalMemorySize();
             long freeRam  = osBean.getFreeMemorySize();
             long usedRam  = totalRam - freeRam;
@@ -81,7 +80,7 @@ public class ramUsage {
 
             System.out.flush();
             Thread.sleep(100);
-        }
+
     }
 
     private static void printSummary(List<Long> samples) {
