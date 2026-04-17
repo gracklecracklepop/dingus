@@ -9,7 +9,6 @@ public class Theme {
     // ═══════════════════════════════════════════════════════════════════════════
 
     public static final Color BG_MAIN = new Color(40, 40, 40, 255);
-    public static final Color BG_ACCENT = new Color(105, 196, 216, 255);
     public static final Color BG_INPUT             = new Color(60, 60, 60);
     public static final Color BG_INPUT_BORDER      = new Color(80, 80, 80);
     public static final Color BG_DROPDOWN_ITEM     = new Color(50, 50, 50);
@@ -19,6 +18,7 @@ public class Theme {
     // ██████████████████████████  BUTTONS  ██████████████████████████████████████
     // ═══════════════════════════════════════════════════════════════════════════
 
+    public static final Color BTN_ACCENT = new Color(93, 109, 113, 255);
     public static final Color BTN_DEFAULT          = new Color(60, 60, 60);
     public static final Color BTN_HOVER            = new Color(100, 100, 100);
     public static final Color BTN_PRESSED          = new Color(80, 80, 80);
