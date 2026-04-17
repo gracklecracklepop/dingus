@@ -3,6 +3,8 @@ import javax.swing.border.Border;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import java.awt.*;
 import java.awt.Desktop;
+import java.lang.management.ManagementFactory;
+import java.lang.management.OperatingSystemMXBean;
 import java.time.Instant;
 
 public class PetMenu {
@@ -23,6 +25,11 @@ public class PetMenu {
     private long lastFedTime = 0L;
     private JButton feedButton;
     private Timer cooldownTimer;
+    long ramUse;
+    long base;
+    private javax.swing.Timer usageTimer;
+    OperatingSystemMXBean osBean = (OperatingSystemMXBean)
+            ManagementFactory.getOperatingSystemMXBean();
 
     private static final String[] GRASS_URLS = {
             "https://www.thisoldhouse.com/wp-content/uploads/2020/08/iStock_511747120-scaled.jpg",
@@ -47,6 +54,34 @@ public class PetMenu {
 
         cooldownTimer = new Timer(1000, e -> refreshFeedButton());
         cooldownTimer.start();
+        base = stats.getBaseRam();
+        startUsageTimer();
+    }
+
+
+    public void usageAdd() throws InterruptedException {
+        ramUse= ramUsage.runLiveMode((com.sun.management.OperatingSystemMXBean) osBean);
+        System.out.println(ramUse - base);
+        stats.addHunger(1);
+        updateLiveStats();
+    }
+    public void startUsageTimer() {
+        if (usageTimer != null) usageTimer.stop();
+        usageTimer = new javax.swing.Timer(1000, e -> {
+            try {
+                usageAdd();
+            } catch (InterruptedException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
+        usageTimer.start();
+    }
+
+    public void stopUsageTimer() {
+        if (usageTimer != null) {
+            usageTimer.stop();
+            usageTimer = null;
+        }
     }
 
     public JPanel getPanel() { return panel; }
@@ -188,7 +223,7 @@ public class PetMenu {
         updateBar(happinessBar, happinessLabel, "Happiness", stats.getHappiness());
         updateBar(energyBar,    energyLabel,    "Energy",    stats.getEnergy());
         mainMenuCoinLabel.setText("🪙 " + stats.getCoins());
-        stats.printStats();
+        //stats.printStats();
     }
 
     // ── Shop Menu ───────────────────────────────────────────────
