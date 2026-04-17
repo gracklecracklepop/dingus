@@ -44,12 +44,6 @@ public class ramUsage {
             String bar = "[" + "#".repeat(filled) + "-".repeat(barWidth - filled) + "]";
 
             long remaining = (endTime - System.currentTimeMillis()) / 1000;
-            System.out.printf("\r%s %5.1f%%  |  Used: %.2f GB / %.2f GB  |  %2ds left  |  Samples: %d",
-                    bar, usagePercent,
-                    usedRam  / 1e9,
-                    totalRam / 1e9,
-                    remaining,
-                    usageSamples.size());
 
             System.out.flush();
             Thread.sleep(100);
@@ -58,30 +52,15 @@ public class ramUsage {
         printSummary(usageSamples);
     }
 
-    private static void runLiveMode(OperatingSystemMXBean osBean)
+    static long runLiveMode(OperatingSystemMXBean osBean)
             throws InterruptedException {
 
-        System.out.println("=== Live System RAM Utilization (Ctrl+C to stop) ===");
 
-        while (true) {
             long totalRam = osBean.getTotalMemorySize();
             long freeRam  = osBean.getFreeMemorySize();
-            long usedRam  = totalRam - freeRam;
-            double usagePercent = (double) usedRam / totalRam * 100;
 
-            int barWidth = 30;
-            int filled = (int) (usagePercent / 100 * barWidth);
-            String bar = "[" + "#".repeat(filled) + "-".repeat(barWidth - filled) + "]";
+            return (totalRam-freeRam)/1000000;
 
-            System.out.printf("\r%s %5.1f%%  |  Used: %.2f GB / %.2f GB  |  Free: %.2f GB",
-                    bar, usagePercent,
-                    usedRam  / 1e9,
-                    totalRam / 1e9,
-                    freeRam  / 1e9);
-
-            System.out.flush();
-            Thread.sleep(100);
-        }
     }
 
     private static void printSummary(List<Long> samples) {
