@@ -30,6 +30,7 @@ public class PetPanel extends JPanel {
 
     Toolkit toolkit = Toolkit.getDefaultToolkit();
     Dimension screenSize = toolkit.getScreenSize();
+    double dpiScale = Theme.getDpiScale();
 
     public PetPanel(JDialog dialog) {
         this.dialog = dialog;

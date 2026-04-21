@@ -23,39 +23,90 @@ public class BedDialog extends JDialog {
         pack();
     }
 
-    // ── Positioning ──────────────────────────────────────────────
-
-    /** Position the bed at the bottom-right of the screen. */
     public void positionAtBottom() {
-        Point pos = getBedScreenPosition();
-        setLocation(pos.x, pos.y+105);
+        setLocation(getBedScreenPosition());
     }
 
     /**
      * Single source of truth for where the bed sits on screen.
-     * Both BedDialog and PetPanel use this so they are always in sync.
+     * Uses the usable screen area which already excludes the taskbar.
+     * Do NOT subtract insets again.
      */
     public static Point getBedScreenPosition() {
-        Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
-        int x = screen.width  - BED_WIDTH  - 70;   // 20px from right edge
-        int y = screen.height - BED_HEIGHT - 132;    // 45px from bottom (taskbar)
+        Rectangle usable = Theme.getUsableScreen();
+
+        int xOffset = 0;
+        int yOffset = 0;
+
+        switch (Theme.getScalePercent()) {
+            case 100 -> {
+                xOffset = -80;
+                yOffset = +15;
+            }
+            case 125 -> {
+                xOffset = -88;
+                yOffset = -14;
+            }
+            case 150 -> {
+                xOffset = -105;
+                yOffset = -18;
+            }
+            case 175 -> {
+                xOffset = -122;
+                yOffset = -22;
+            }
+            default -> {
+                xOffset = -70;
+                yOffset = -10;
+            }
+        }
+
+        int x = usable.x + usable.width - BED_WIDTH + xOffset;
+        int y = usable.y + usable.height - BED_HEIGHT + yOffset;
+
         return new Point(x, y);
     }
-
     /**
      * Returns the screen position the pet dialog should snap to
      * so the cat sprite sits correctly aligned over the bed sprite.
-     * Adjust snapOffsetX / snapOffsetY to fine-tune the alignment.
+     * Adjust the offsets to fine-tune alignment.
      */
     public static Point getCatSnapPosition() {
         Point bedPos = getBedScreenPosition();
 
-        // How many pixels to shift the cat dialog relative to the bed
-        // Positive X = right, Positive Y = down
-        int snapOffsetX = (BED_WIDTH  - Main.PET_WIDTH)  / 2; // Center cat over bed horizontally
-        int snapOffsetY = (BED_HEIGHT - Main.PET_HEIGHT) / 2; // Center cat over bed vertically
+        int snapOffsetX = (BED_WIDTH - Main.PET_WIDTH) / 2;
+        int snapOffsetY = -Main.PET_HEIGHT + BED_HEIGHT;
 
-        return new Point(bedPos.x + snapOffsetX, bedPos.y + snapOffsetY);
+        int extraX = 0;
+        int extraY = 0;
+
+        switch (Theme.getScalePercent()) {
+            case 100 -> {
+                extraX = 0;
+                extraY = 5;
+            }
+            case 125 -> {
+                extraX = -6;
+                extraY = -119;
+            }
+            case 150 -> {
+                extraX = -8;
+                extraY = -142;
+            }
+            case 175 -> {
+                extraX = -10;
+                extraY = -166;
+            }
+            default -> {
+                extraX = -5;
+                extraY = -95;
+            }
+        }
+
+        return new Point(
+                bedPos.x + snapOffsetX + extraX,
+                bedPos.y + snapOffsetY + extraY
+        );
     }
 
     // ── Inner panel that draws the bed ───────────────────────────

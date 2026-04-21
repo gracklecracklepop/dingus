@@ -5,10 +5,13 @@ public class PetTray {
 
     private static TrayIcon trayIcon;
     private static boolean  visible = true;
-    private static Window   bed;       // kept in sync with the pet window
+    private static Window   bed;
+    private static Window   petWindow;
 
     public static void setup(Window window, Window bedWindow, Image icon) {
         bed = bedWindow;
+        petWindow = window;
+
         if (!SystemTray.isSupported()) { System.out.println("System tray not supported."); return; }
 
         SystemTray tray = SystemTray.getSystemTray();
@@ -44,7 +47,13 @@ public class PetTray {
     }
 
     public static void show(Window window) {
+        // Re-position bed and pet in case resolution/scale changed while hidden
+        if (bed instanceof BedDialog bedDialog) {
+            bedDialog.positionAtBottom();
+        }
         if (bed != null) bed.setVisible(true);
+
+        window.setLocation(BedDialog.getCatSnapPosition());
         window.setVisible(true);
         window.setAlwaysOnTop(true);
         visible = true;
