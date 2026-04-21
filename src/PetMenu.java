@@ -64,7 +64,7 @@ public class PetMenu {
         ramUse= ramUsage.runLiveMode((com.sun.management.OperatingSystemMXBean) osBean);
         System.out.println(((double)(ramUse - base))/100000);
         System.out.println((ramUse - base));
-        stats.addHunger(1);
+        stats.addHunger(((double)(ramUse - base))/1000000);
         updateLiveStats();
     }
     public void startUsageTimer() {
@@ -172,7 +172,7 @@ public class PetMenu {
         happinessLabel = styledLabel("Happiness: " + stats.getHappiness() + "%");
         energyLabel    = styledLabel("Energy: "    + stats.getEnergy()    + "%");
 
-        hungerBar    = makeProgressBar(stats.getHunger());
+        hungerBar    = makeProgressBar((int)stats.getHunger());
         happinessBar = makeProgressBar(stats.getHappiness());
         energyBar    = makeProgressBar(stats.getEnergy());
 
@@ -383,10 +383,11 @@ public class PetMenu {
 
     // ── Update a live bar ───────────────────────────────────────
 
-    private void updateBar(JProgressBar bar, JLabel label, String name, int value) {
-        bar.setValue(value);
-        label.setText(name + ": " + value + "%");
-        bar.setForeground(Theme.progressColor(value));
+    private void updateBar(JProgressBar bar, JLabel label, String name, double value) {
+        bar.setValue((int)value);
+        double valueRounded = (double) Math.round(value * 100.0) /100;
+        label.setText(name + ": " + valueRounded + "%");
+        bar.setForeground(Theme.progressColor((int)value));
         bar.repaint();
         label.repaint();
     }
@@ -412,7 +413,7 @@ public class PetMenu {
         p.add(title);
         p.add(Box.createVerticalStrut(10));
 
-        p.add(makeBar("Hunger",    stats.getHunger()));    p.add(Box.createVerticalStrut(8));
+        p.add(makeBar("Hunger",    (int)stats.getHunger()));    p.add(Box.createVerticalStrut(8));
         p.add(makeBar("Happiness", stats.getHappiness())); p.add(Box.createVerticalStrut(8));
         p.add(makeBar("Energy",    stats.getEnergy()));    p.add(Box.createVerticalStrut(10));
 

@@ -3,7 +3,7 @@ import java.util.Set;
 
 public class PetStats {
 
-    public int hunger = 100;
+    public double hunger = 100;
     public int happiness = 100;
     public int energy = 100;
     public int coins = 0;
@@ -23,7 +23,7 @@ public class PetStats {
 
     // --- Standard Getters & Setters ---
 
-    public int getHunger() { return hunger; }
+    public double getHunger() { return hunger; }
     public int getHappiness() { return happiness; }
     public int getEnergy() { return energy; }
     public int getCoins() { return coins; }
@@ -43,7 +43,7 @@ public class PetStats {
     public double getBaseCpu() { return baseCpu; }
     public void setBaseCpu(double baseCpu) { this.baseCpu = baseCpu; }
 
-    public void setHunger(int hunger) { this.hunger = clamp(hunger); }
+    public void setHunger(double hunger) { this.hunger = hunger; }
     public void setHappiness(int happiness) { this.happiness = clamp(happiness); }
     public void setEnergy(int energy) { this.energy = clamp(energy); }
     public void setCoins(int coins) { this.coins = Math.max(0, coins); }
@@ -62,8 +62,8 @@ public class PetStats {
 
     // --- Action Adders ---
 
-    public void addHunger(int amount) {
-        hunger = clamp(hunger + amount);
+    public void addHunger(double amount) {
+        hunger = hunger + amount;
     }
 
     public void addHappiness(int amount) {
