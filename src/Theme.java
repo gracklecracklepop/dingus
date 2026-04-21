@@ -8,7 +8,8 @@ public class Theme {
     // ██████████████████████████  BACKGROUNDS  ██████████████████████████████████
     // ═══════════════════════════════════════════════════════════════════════════
 
-    public static final Color BG_MAIN = new Color(40, 40, 40, 255);
+    public static final Color BG_MAIN              = new Color(40, 40, 40, 255);
+    public static final Color BG_MAIN_TRANSPARENT  = new Color(40, 40, 40, 240);
     public static final Color BG_INPUT             = new Color(60, 60, 60);
     public static final Color BG_INPUT_BORDER      = new Color(80, 80, 80);
     public static final Color BG_DROPDOWN_ITEM     = new Color(50, 50, 50);
@@ -18,7 +19,7 @@ public class Theme {
     // ██████████████████████████  BUTTONS  ██████████████████████████████████████
     // ═══════════════════════════════════════════════════════════════════════════
 
-    public static final Color BTN_ACCENT = new Color(93, 109, 113, 255);
+    public static final Color BTN_ACCENT           = new Color(84, 87, 87, 255);
     public static final Color BTN_DEFAULT          = new Color(60, 60, 60);
     public static final Color BTN_HOVER            = new Color(100, 100, 100);
     public static final Color BTN_PRESSED          = new Color(80, 80, 80);
@@ -51,9 +52,9 @@ public class Theme {
     // ═══════════════════════════════════════════════════════════════════════════
 
     public static final Color PROGRESS_TRACK       = new Color(60, 60, 60);
-    public static final Color PROGRESS_HIGH        = new Color(108, 227, 99);   // >= 70%
-    public static final Color PROGRESS_MED         = new Color(211, 255, 50);    // >= 30%
-    public static final Color PROGRESS_LOW         = new Color(255, 200, 80);     // < 30%
+    public static final Color PROGRESS_HIGH        = new Color(108, 227, 99);
+    public static final Color PROGRESS_MED         = new Color(211, 255, 50);
+    public static final Color PROGRESS_LOW         = new Color(255, 200, 80);
     public static final Color PROGRESS_RAM         = new Color(100, 200, 100);
     public static final Color PROGRESS_CPU         = new Color(100, 150, 255);
 
@@ -78,19 +79,16 @@ public class Theme {
     // ██████████████████████████  FONT CONFIG  █████████████████████████████████
     // ═══════════════════════════════════════════════════════════════════════════
 
-    public static final String FONT_PATH           = "images/Shape Bit.otf";
+    public static final String FONT_PATH           = "images/Atop.ttf";
     public static final String FONT_FALLBACK       = "Arial";
+    public static final String EMOJI_FONT          = "Segoe UI Emoji";
 
-    public static final int FONT_SIZE_TITLE        = 22;
-    public static final int FONT_SIZE_HEADING      = 17;
-    public static final int FONT_SIZE_BUTTON       = 13;
-    public static final int FONT_SIZE_LABEL        = 12;
-    public static final int FONT_SIZE_BODY         = 12;
-    public static final int FONT_SIZE_SMALL        = 10;
-    public static final String EMOJI_FONT = "Segoe UI Emoji";
-    public static Font emojiFont(int size) {
-        return new Font(EMOJI_FONT, Font.PLAIN, size);
-    }
+    public static final int FONT_SIZE_TITLE        = 23;
+    public static final int FONT_SIZE_HEADING      = 18;
+    public static final int FONT_SIZE_BUTTON       = 14;
+    public static final int FONT_SIZE_LABEL        = 13;
+    public static final int FONT_SIZE_BODY         = 14;
+    public static final int FONT_SIZE_SMALL        = 11;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // ██████████████████████████  SIZING  ██████████████████████████████████████
@@ -129,19 +127,18 @@ public class Theme {
         return cachedFont.deriveFont(Font.PLAIN, (float) size);
     }
 
+    public static Font emojiFont(int size) {
+        return new Font(EMOJI_FONT, Font.PLAIN, size);
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // ██████████████████████████  HELPERS  ██████████████████████████████████████
     // ═══════════════════════════════════════════════════════════════════════════
 
     public static Color progressColor(int value) {
-        if (value >= 70) {
-            return PROGRESS_HIGH;
-        } else if (value >= 30) {
-            return PROGRESS_MED;
-        } else {
-            return PROGRESS_LOW;
-        }
-
+        if (value >= 70) return PROGRESS_HIGH;
+        else if (value >= 30) return PROGRESS_MED;
+        else return PROGRESS_LOW;
     }
 
     public static void applyUIManagerDefaults() {
@@ -168,17 +165,15 @@ public class Theme {
         UIManager.put("PopupMenu.border",     BorderFactory.createLineBorder(BG_INPUT_BORDER, 1));
     }
 
-    /**
-     * Draws a string using the custom font for normal text
-     * and the emoji font for emoji characters.
-     * Returns the total width drawn.
-     */
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ██████████████████████████  MIXED TEXT RENDERING  █████████████████████████
+    // ═══════════════════════════════════════════════════════════════════════════
+
     public static int drawMixedString(Graphics2D g2, String text, int x, int y, int fontSize) {
         int currentX = x;
-        Font textFont  = font(fontSize);
-        Font emojFont  = emojiFont(fontSize);
+        Font textFont = font(fontSize);
+        Font emojFont = emojiFont(fontSize);
 
-        // Process character by character, grouping runs of same type
         StringBuilder buffer = new StringBuilder();
         boolean currentIsEmoji = false;
 
@@ -186,7 +181,6 @@ public class Theme {
             int codePoint = text.codePointAt(i);
             boolean isEmoji = isEmojiCodePoint(codePoint);
 
-            // If we switch from text→emoji or emoji→text, flush the buffer
             if (buffer.length() > 0 && isEmoji != currentIsEmoji) {
                 g2.setFont(currentIsEmoji ? emojFont : textFont);
                 String segment = buffer.toString();
@@ -200,7 +194,6 @@ public class Theme {
             i += Character.charCount(codePoint);
         }
 
-        // Flush remaining buffer
         if (buffer.length() > 0) {
             g2.setFont(currentIsEmoji ? emojFont : textFont);
             String segment = buffer.toString();
@@ -208,16 +201,13 @@ public class Theme {
             currentX += g2.getFontMetrics().stringWidth(segment);
         }
 
-        return currentX - x; // Total width drawn
+        return currentX - x;
     }
 
-    /**
-     * Measures the total width of a mixed emoji/text string.
-     */
     public static int mixedStringWidth(Graphics2D g2, String text, int fontSize) {
         int totalWidth = 0;
-        Font textFont  = font(fontSize);
-        Font emojFont  = emojiFont(fontSize);
+        Font textFont = font(fontSize);
+        Font emojFont = emojiFont(fontSize);
 
         StringBuilder buffer = new StringBuilder();
         boolean currentIsEmoji = false;
@@ -245,40 +235,31 @@ public class Theme {
         return totalWidth;
     }
 
-    /**
-     * Returns true if the given Unicode code point is an emoji or symbol
-     * that should be rendered with the emoji font.
-     */
     private static boolean isEmojiCodePoint(int codePoint) {
-        // Common emoji ranges
-        if (codePoint >= 0x1F600 && codePoint <= 0x1F64F) return true; // Emoticons
-        if (codePoint >= 0x1F300 && codePoint <= 0x1F5FF) return true; // Misc symbols & pictographs
-        if (codePoint >= 0x1F680 && codePoint <= 0x1F6FF) return true; // Transport & map
-        if (codePoint >= 0x1F900 && codePoint <= 0x1F9FF) return true; // Supplemental symbols
-        if (codePoint >= 0x1FA00 && codePoint <= 0x1FA6F) return true; // Chess symbols
-        if (codePoint >= 0x1FA70 && codePoint <= 0x1FAFF) return true; // Extended-A
-        if (codePoint >= 0x2600  && codePoint <= 0x26FF)  return true; // Misc symbols
-        if (codePoint >= 0x2700  && codePoint <= 0x27BF)  return true; // Dingbats
-        if (codePoint >= 0xFE00  && codePoint <= 0xFE0F)  return true; // Variation selectors
-        if (codePoint >= 0x200D  && codePoint <= 0x200D)  return true; // Zero-width joiner
-        if (codePoint >= 0x2300  && codePoint <= 0x23FF)  return true; // Misc technical
-        if (codePoint >= 0x2B50  && codePoint <= 0x2B55)  return true; // Stars
-        if (codePoint == 0x2764  || codePoint == 0x2763)  return true; // Hearts
-        if (codePoint >= 0x231A  && codePoint <= 0x231B)  return true; // Watch, hourglass
-        if (codePoint >= 0x23E9  && codePoint <= 0x23F3)  return true; // Media controls
-        if (codePoint >= 0x25AA  && codePoint <= 0x25FE)  return true; // Geometric shapes
-        if (codePoint == 0x00A9  || codePoint == 0x00AE)  return true; // ©®
-        if (codePoint == 0x2122)                          return true; // ™
-        if (codePoint >= 0x203C  && codePoint <= 0x2049)  return true; // ‼⁉
-        if (codePoint >= 0x20E3  && codePoint <= 0x20E3)  return true; // Combining enclosing keycap
-        if (codePoint >= 0xE0020 && codePoint <= 0xE007F) return true; // Tags
+        if (codePoint >= 0x1F600 && codePoint <= 0x1F64F) return true;
+        if (codePoint >= 0x1F300 && codePoint <= 0x1F5FF) return true;
+        if (codePoint >= 0x1F680 && codePoint <= 0x1F6FF) return true;
+        if (codePoint >= 0x1F900 && codePoint <= 0x1F9FF) return true;
+        if (codePoint >= 0x1FA00 && codePoint <= 0x1FA6F) return true;
+        if (codePoint >= 0x1FA70 && codePoint <= 0x1FAFF) return true;
+        if (codePoint >= 0x2600  && codePoint <= 0x26FF)  return true;
+        if (codePoint >= 0x2700  && codePoint <= 0x27BF)  return true;
+        if (codePoint >= 0xFE00  && codePoint <= 0xFE0F)  return true;
+        if (codePoint == 0x200D)                          return true;
+        if (codePoint >= 0x2300  && codePoint <= 0x23FF)  return true;
+        if (codePoint >= 0x2B50  && codePoint <= 0x2B55)  return true;
+        if (codePoint == 0x2764  || codePoint == 0x2763)  return true;
+        if (codePoint >= 0x231A  && codePoint <= 0x231B)  return true;
+        if (codePoint >= 0x23E9  && codePoint <= 0x23F3)  return true;
+        if (codePoint >= 0x25AA  && codePoint <= 0x25FE)  return true;
+        if (codePoint == 0x00A9  || codePoint == 0x00AE)  return true;
+        if (codePoint == 0x2122)                          return true;
+        if (codePoint >= 0x203C  && codePoint <= 0x2049)  return true;
+        if (codePoint == 0x20E3)                          return true;
+        if (codePoint >= 0xE0020 && codePoint <= 0xE007F) return true;
         return false;
     }
 
-    /**
-     * Creates a JLabel that renders emojis with the emoji font
-     * and regular text with the custom pixel font.
-     */
     public static JLabel mixedLabel(String text, int fontSize, Color color) {
         JLabel label = new JLabel(text) {
             @Override protected void paintComponent(Graphics g) {
@@ -305,5 +286,57 @@ public class Theme {
         };
         label.setForeground(color);
         return label;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ██████████████████████████  SCREEN HELPERS  ██████████████████████████████
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    public static GraphicsConfiguration getPrimaryScreenConfig() {
+        GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        GraphicsDevice gd = ge.getDefaultScreenDevice();
+        return gd.getDefaultConfiguration();
+    }
+
+    /**
+     * Returns the usable desktop area, excluding taskbar/docked bars.
+     * This is the correct "working area" to position your pet in.
+     */
+    public static Rectangle getUsableScreen() {
+        GraphicsConfiguration gc = getPrimaryScreenConfig();
+        Rectangle bounds = gc.getBounds();
+        Insets insets = Toolkit.getDefaultToolkit().getScreenInsets(gc);
+
+        return new Rectangle(
+                bounds.x + insets.left,
+                bounds.y + insets.top,
+                bounds.width  - insets.left - insets.right,
+                bounds.height - insets.top  - insets.bottom
+        );
+    }
+
+    /**
+     * Returns the actual screen insets for the primary screen.
+     */
+    public static Insets getScreenInsets() {
+        return Toolkit.getDefaultToolkit().getScreenInsets(getPrimaryScreenConfig());
+    }
+
+    /**
+     * Returns DPI scale using the graphics transform.
+     */
+    public static double getDpiScale() {
+        return getPrimaryScreenConfig().getDefaultTransform().getScaleX();
+    }
+
+    /**
+     * Scales a logical pixel value by current DPI.
+     */
+    public static int scaled(int pixels) {
+        return (int) Math.round(pixels * getDpiScale());
+    }
+
+    public static int getScalePercent() {
+        return (int) Math.round(getDpiScale() * 100);
     }
 }

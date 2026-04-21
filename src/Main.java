@@ -60,6 +60,13 @@ public class Main {
             dialog.setAlwaysOnTop(true);
             dialog.setResizable(false);
 
+// Position using usable screen area — always above the taskbar
+            Rectangle usable = Theme.getUsableScreen();
+            dialog.setLocation(
+                    usable.x + usable.width  - PET_WIDTH  - 40,
+                    usable.y + usable.height - PET_HEIGHT
+            );
+
             PetPanel panel = new PetPanel(dialog);
             panel.setOpaque(false);
 
