@@ -44,12 +44,12 @@ public class BedDialog extends JDialog {
                 yOffset = +15;
             }
             case 125 -> {
-                xOffset = -88;
-                yOffset = -14;
+                xOffset = -38;
+                yOffset = 9;
             }
             case 150 -> {
-                xOffset = -105;
-                yOffset = -18;
+                xOffset = -38;
+                yOffset = 10;
             }
             case 175 -> {
                 xOffset = -122;
@@ -86,12 +86,12 @@ public class BedDialog extends JDialog {
                 extraY = 5;
             }
             case 125 -> {
-                extraX = -6;
-                extraY = -119;
+                extraX = -38;
+                extraY = 65;
             }
             case 150 -> {
-                extraX = -8;
-                extraY = -142;
+                extraX = 0;
+                extraY = 100;
             }
             case 175 -> {
                 extraX = -10;
