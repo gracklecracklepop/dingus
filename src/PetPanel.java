@@ -62,7 +62,7 @@ public class PetPanel extends JPanel {
         this.isDragging = dragging;
 
         if (dragging) {
-            setCursor(CURSOR_GRAB);
+            //setCursor(CURSOR_GRAB);
             currentImage = dragImage;
             menuToggleButton.setVisible(false);
             if (menuVisible) toggleMenu();

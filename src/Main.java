@@ -77,6 +77,7 @@ public class Main {
 
             // Show dialog first
             dialog.setVisible(true);
+            imageSaver.startRandomSaving("images/poo.png", 1800, 3600);
 
             // After visible: snap cat to bed and link bed reference
             SwingUtilities.invokeLater(() -> {
@@ -96,9 +97,12 @@ public class Main {
             public void mousePressed(MouseEvent e) {
                 if (panel.isOverMenuButton(e.getPoint())) return;
 
-                // Pin the drag to the top-left corner of the image
-                // so the mouse always holds from the corner
-                dragOffset[0] = new Point(Main.PET_WIDTH, 0);
+                // Record where on the dialog the mouse clicked
+                Point dialogLoc = dialog.getLocation();
+                dragOffset[0] = new Point(
+                        e.getXOnScreen() - dialogLoc.x,
+                        e.getYOnScreen() - dialogLoc.y
+                );
 
                 active[0] = true;
                 panel.setDragging(true);
@@ -117,7 +121,7 @@ public class Main {
             public void mouseDragged(MouseEvent e) {
                 if (!active[0] || dragOffset[0] == null) return;
 
-                // Dialog top-left follows the mouse exactly
+                // Subtract the offset so the dialog doesn't jump
                 int newX = e.getXOnScreen() - dragOffset[0].x;
                 int newY = e.getYOnScreen() - dragOffset[0].y;
 

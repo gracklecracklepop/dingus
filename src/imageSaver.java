@@ -104,7 +104,7 @@ public class imageSaver {
 
     public static void main(String[] args) {
         // Start it (runs forever until you kill program or call stop())
-        startRandomSaving("images/poo.png", 5, 10);
+        startRandomSaving("images/poo.png", 30, 100);
 
         // Optional: keep main thread alive
         try {
