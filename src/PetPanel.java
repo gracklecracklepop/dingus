@@ -12,10 +12,9 @@ public class PetPanel extends JPanel {
     private static final int SNAP_MARGIN = 60;
     PetStats petstat = SaveManager.load();
 
-
-    private  BufferedImage normalImage;
-    private  BufferedImage dragImage;
-    private  BufferedImage bedImage;
+    private BufferedImage normalImage;
+    private BufferedImage dragImage;
+    private BufferedImage bedImage;
     private BufferedImage currentImage;
 
     private final JButton menuToggleButton;
@@ -26,6 +25,7 @@ public class PetPanel extends JPanel {
     private BedDialog bed;
 
     private boolean isDragging = false;
+    private int preDragHeight = -1;
 
     private static final Cursor CURSOR_DEFAULT = Cursor.getDefaultCursor();
     private static final Cursor CURSOR_GRAB    = Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR);
@@ -57,26 +57,25 @@ public class PetPanel extends JPanel {
         currentImage = bedImage;
         repaint();
     }
-    public void setimages(String color){
+
+    public void setimages(String color) {
         System.out.println(color);
-        switch (color){
+        switch (color) {
             case "Void (Black)":
-                normalImage  = loadImage("images/blacksitting.png");
-                dragImage    = loadImage("images/catscruff.jpg");
-                bedImage     = loadImage("images/blackinbed.png");
+                normalImage = loadImage("dingus - Copy/blacksitting.png");
+                dragImage   = loadImage("dingus - Copy/blackscruff.png");
+                bedImage    = loadImage("dingus - Copy/blacksitting.png");
                 break;
             case "Default (Orange)":
-                normalImage  = loadImage("images/orangesitting.png");
-                dragImage    = loadImage("images/catscruff.jpg");
-                bedImage     = loadImage("images/orangeinbed.png");
+                normalImage = loadImage("dingus - Copy/orangesitting.png");
+                dragImage   = loadImage("dingus - Copy/orangescruff.png");
+                bedImage    = loadImage("dingus - Copy/orangesitting.png");
                 break;
             case "Ghost (White)":
-                normalImage  = loadImage("images/whitesitting.png");
-                dragImage    = loadImage("images/catscruff.jpg");
-                bedImage     = loadImage("images/whiteinbed.png");
+                normalImage = loadImage("dingus - Copy/whitesitting.png");
+                dragImage   = loadImage("dingus - Copy/whitescruff.png");
+                bedImage    = loadImage("dingus - Copy/whitesitting.png");
                 break;
-
-
         }
     }
 
@@ -84,14 +83,25 @@ public class PetPanel extends JPanel {
         this.isDragging = dragging;
 
         if (dragging) {
-            //setCursor(CURSOR_GRAB);
-            currentImage = dragImage;
-            menuToggleButton.setVisible(false);
-            if (menuVisible) toggleMenu();
-            if (bed != null) bed.setVisible(true);
+            preDragHeight = dialog.getHeight();
+            System.out.println("BEFORE resize: " + dialog.getWidth() + "x" + dialog.getHeight());
+            dialog.setResizable(true);
+            dialog.setSize(dialog.getWidth(), preDragHeight + 100);
+            dialog.setLocation(dialog.getX(), dialog.getY() - 100);
+            dialog.setResizable(false);
+            System.out.println("AFTER resize: " + dialog.getWidth() + "x" + dialog.getHeight());
+            // ... rest unchanged
 
         } else {
             setCursor(CURSOR_DEFAULT);
+
+            if (preDragHeight != -1) {
+                dialog.setResizable(true);
+                dialog.setSize(dialog.getWidth(), preDragHeight);
+                dialog.setLocation(dialog.getX(), dialog.getY() + 100);
+                dialog.setResizable(false);
+                preDragHeight = -1;
+            }
 
             if (isNearBed()) {
                 snapToBed();
@@ -159,7 +169,6 @@ public class PetPanel extends JPanel {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,  RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-                // Background
                 Color bg = getModel().isPressed()  ? new Color(60, 60, 60, 220)
                         : getModel().isRollover() ? new Color(80, 80, 80, 220)
                         :                           new Color(50, 50, 50, 200);
@@ -168,9 +177,8 @@ public class PetPanel extends JPanel {
                 g2.setColor(new Color(100, 100, 100));
                 g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
 
-                // Use emoji font for drawing the text
                 g2.setColor(Color.WHITE);
-                g2.setFont(Theme.emojiFont(16)); // ← emoji font here instead of Arial
+                g2.setFont(Theme.emojiFont(16));
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(getText(),
                         (getWidth()  - fm.stringWidth(getText())) / 2,
@@ -201,10 +209,13 @@ public class PetPanel extends JPanel {
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,  RenderingHints.VALUE_ANTIALIAS_ON);
 
-
-
         if (currentImage != null) {
-            g2.drawImage(currentImage, 0, 80, BedDialog.imgW, BedDialog.imgH, this);
+            if (isDragging) {
+                // use full panel height so the image stretches into the extra 100px
+                g2.drawImage(dragImage, 0, +100, BedDialog.imgW - 75, getHeight() -100, this);
+            } else {
+                g2.drawImage(currentImage, 0, 80, BedDialog.imgW, BedDialog.imgH, this);
+            }
         }
 
         g2.dispose();
