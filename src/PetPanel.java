@@ -36,7 +36,7 @@ public class PetPanel extends JPanel {
         this.dialog = dialog;
         setLayout(null);
 
-        normalImage  = loadImage("images/catsitting.png");
+        normalImage  = loadImage("images/dingus/orangesitting.png");
         dragImage    = loadImage("images/catscruff.jpg");
         bedImage     = loadImage("images/catinbed.jpg");
         currentImage = normalImage;
