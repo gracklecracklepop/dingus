@@ -11,7 +11,7 @@ public class PetStats {
     // --- WIZARD VARIABLES ---
     private String name = "Dingus";
     private String gender = "Robot";
-    private String spriteColor = "Default (Orange)";
+    private String spriteColor = "";
     private long baseRam = 0;
     private double baseCpu = 0; // NEW: CPU baseline percentage
 
@@ -43,7 +43,7 @@ public class PetStats {
     public double getBaseCpu() { return baseCpu; }
     public void setBaseCpu(double baseCpu) { this.baseCpu = baseCpu; }
 
-    public void setHunger(double hunger) { this.hunger = hunger; }
+    public void setHunger(double hunger) { this.hunger = clampDouble(hunger); }
     public void setHappiness(int happiness) { this.happiness = clamp(happiness); }
     public void setEnergy(int energy) { this.energy = clamp(energy); }
     public void setCoins(int coins) { this.coins = Math.max(0, coins); }
@@ -63,7 +63,7 @@ public class PetStats {
     // --- Action Adders ---
 
     public void addHunger(double amount) {
-        hunger = hunger + amount;
+        hunger = clampDouble(hunger + amount);
     }
 
     public void addHappiness(int amount) {
@@ -81,6 +81,9 @@ public class PetStats {
     // ── Helper ──
 
     private int clamp(int value) {
+        return Math.max(0, Math.min(100, value));
+    }
+    private double clampDouble(double value) {
         return Math.max(0, Math.min(100, value));
     }
 

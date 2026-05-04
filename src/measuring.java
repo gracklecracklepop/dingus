@@ -11,7 +11,7 @@ public class measuring extends JPanel {
         OperatingSystemMXBean osBean = (OperatingSystemMXBean)
                 ManagementFactory.getOperatingSystemMXBean();
         try {
-            ramUsage.runTimedMode(osBean, 10);
+            ramUsage.runRamTimedMode(osBean, 10);
 
         } catch (InterruptedException e) {
             throw new RuntimeException(e);

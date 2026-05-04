@@ -1,14 +1,21 @@
 import com.sun.management.OperatingSystemMXBean;
+
+import javax.swing.*;
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ramUsage {
+    private JLabel cpuTitle, cpuLiveStats;
+    private JProgressBar cpuProgressBar;
+    private JButton cpuNextBtn, cpuSkipBtn;
+    private SwingWorker<Double, Object[]> cpuWorker;
     public static void main(String[] args) throws InterruptedException {
 
 
         // Set to true to run for 30 seconds and collect samples
         boolean timedMode = true;
+
         int durationSeconds = 30;
 
         if (timedMode) {
@@ -17,7 +24,7 @@ public class ramUsage {
         }
     }
 
-    static void runTimedMode(OperatingSystemMXBean osBean, int durationSeconds)
+    static void runRamTimedMode(OperatingSystemMXBean osBean, int durationSeconds)
             throws InterruptedException {
 
         List<Long> usageSamples = new ArrayList<>();
@@ -52,7 +59,7 @@ public class ramUsage {
         printSummary(usageSamples);
     }
 
-    static long runLiveMode(OperatingSystemMXBean osBean)
+    static long runRamLiveMode(OperatingSystemMXBean osBean)
             throws InterruptedException {
 
 
@@ -92,5 +99,11 @@ public class ramUsage {
             System.out.printf("  t=%2ds  →  %.2f GB%n", i + 1, samples.get(i) / 1e9);
         }
         System.out.println(avg);
+    }
+    static double runCpuLiveMode(OperatingSystemMXBean osBean) throws InterruptedException {
+        osBean.getCpuLoad(); // warm-up read
+        Thread.sleep(200);   // brief settle, same pattern as SwingWorker version
+        double load = osBean.getCpuLoad();
+        return Math.max(0, load) * 100; // clamp negatives (-1.0 = unavailable), return as percent
     }
 }
