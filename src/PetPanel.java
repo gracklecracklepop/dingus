@@ -212,7 +212,7 @@ public class PetPanel extends JPanel {
         if (currentImage != null) {
             if (isDragging) {
                 // use full panel height so the image stretches into the extra 100px
-                g2.drawImage(dragImage, 0, +100, BedDialog.imgW - 125, getHeight() -100, this);
+                g2.drawImage(currentImage, 0, +100, BedDialog.imgW - 125, getHeight() -100, this);
             } else {
                 g2.drawImage(currentImage, 0, 80, BedDialog.imgW, BedDialog.imgH, this);
             }
