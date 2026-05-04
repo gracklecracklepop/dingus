@@ -61,7 +61,7 @@ public class PetMenu {
 
 
     public void usageAdd() throws InterruptedException {
-        ramUse= ramUsage.runLiveMode((com.sun.management.OperatingSystemMXBean) osBean);
+        ramUse= ramUsage.runRamLiveMode((com.sun.management.OperatingSystemMXBean) osBean);
         System.out.println(((double)(ramUse - base))/100000);
         System.out.println((ramUse - base));
         stats.addHunger(((double)(ramUse - base))/1000000);
@@ -72,6 +72,8 @@ public class PetMenu {
         usageTimer = new javax.swing.Timer(1000, e -> {
             try {
                 usageAdd();
+
+
             } catch (InterruptedException ex) {
                 throw new RuntimeException(ex);
             }
@@ -246,6 +248,7 @@ public class PetMenu {
         updateBar(happinessBar, happinessLabel, "Happiness", stats.getHappiness());
         updateBar(energyBar,    energyLabel,    "Energy",    stats.getEnergy());
         mainMenuCoinLabel.setText("🪙 " + stats.getCoins());
+
         //stats.printStats();
     }
 

@@ -7,8 +7,13 @@ import java.io.IOException;
 
 public class BedDialog extends JDialog {
 
-    static final int BED_WIDTH  = 220;
-    static final int BED_HEIGHT = 80;
+
+    static Toolkit toolkit = Toolkit.getDefaultToolkit();
+    static Dimension screenSize = toolkit.getScreenSize();
+    public static int imgW = (int)(screenSize.getWidth()  / 5);
+    public static int imgH = (int)(screenSize.getHeight() / 5);
+    static final int BED_WIDTH  = imgW;
+    static final int BED_HEIGHT = imgH;
 
     public BedDialog(JFrame owner) {
         super(owner);
@@ -40,7 +45,7 @@ public class BedDialog extends JDialog {
 
         switch (Theme.getScalePercent()) {
             case 100 -> {
-                xOffset = -80;
+                xOffset = -30;
                 yOffset = +15;
             }
             case 125 -> {
@@ -125,12 +130,13 @@ public class BedDialog extends JDialog {
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
             if (bedImage != null) {
-                g.drawImage(bedImage, 0, 0, getWidth(), getHeight(), this);
+                g.drawImage(bedImage, 12, 11, getWidth(), getHeight(), this);
             }
+
         }
 
         private static BufferedImage loadBedImage() {
-            try { return ImageIO.read(new File("images/bed.png")); }
+            try { return ImageIO.read(new File("images/blackbed.png")); }
             catch (IOException ignored) { return null; }
         }
     }
