@@ -64,17 +64,17 @@ public class PetPanel extends JPanel {
             case "Void (Black)":
                 normalImage = loadImage("dingus - Copy/blacksitting.png");
                 dragImage   = loadImage("dingus - Copy/blackscruff.png");
-                bedImage    = loadImage("dingus - Copy/blacksitting.png");
+                bedImage    = loadImage("dingus - Copy/blackinbed.png");
                 break;
             case "Default (Orange)":
                 normalImage = loadImage("dingus - Copy/orangesitting.png");
                 dragImage   = loadImage("dingus - Copy/orangescruff.png");
-                bedImage    = loadImage("dingus - Copy/orangesitting.png");
+                bedImage    = loadImage("dingus - Copy/orangeinbed.png");
                 break;
             case "Ghost (White)":
                 normalImage = loadImage("dingus - Copy/whitesitting.png");
                 dragImage   = loadImage("dingus - Copy/whitescruff.png");
-                bedImage    = loadImage("dingus - Copy/whitesitting.png");
+                bedImage    = loadImage("dingus - Copy/whiteinbed.png");
                 break;
         }
     }
@@ -212,7 +212,7 @@ public class PetPanel extends JPanel {
         if (currentImage != null) {
             if (isDragging) {
                 // use full panel height so the image stretches into the extra 100px
-                g2.drawImage(dragImage, 0, +100, BedDialog.imgW - 75, getHeight() -100, this);
+                g2.drawImage(dragImage, 0, +100, BedDialog.imgW - 125, getHeight() -100, this);
             } else {
                 g2.drawImage(currentImage, 0, 80, BedDialog.imgW, BedDialog.imgH, this);
             }

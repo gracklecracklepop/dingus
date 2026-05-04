@@ -136,7 +136,7 @@ public class BedDialog extends JDialog {
         }
 
         private static BufferedImage loadBedImage() {
-            try { return ImageIO.read(new File("images/blackbed.png")); }
+            try { return ImageIO.read(new File("dingus - Copy/orangebed.png")); }
             catch (IOException ignored) { return null; }
         }
     }
