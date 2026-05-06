@@ -91,6 +91,11 @@ public class PetPanel extends JPanel {
             dialog.setResizable(false);
             menuToggleButton.setVisible(false);
             System.out.println("AFTER resize: " + dialog.getWidth() + "x" + dialog.getHeight());
+            currentImage = dragImage;
+            bed.setVisible(true);
+            bed.setAlwaysOnTop(false);
+            dialog.setAlwaysOnTop(true);
+
             // ... rest unchanged
 
         } else {

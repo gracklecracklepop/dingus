@@ -7,7 +7,6 @@ import java.io.IOException;
 
 public class BedDialog extends JDialog {
 
-
     static Toolkit toolkit = Toolkit.getDefaultToolkit();
     static Dimension screenSize = toolkit.getScreenSize();
     public static int imgW = (int)(screenSize.getWidth()  / 5);
@@ -15,8 +14,7 @@ public class BedDialog extends JDialog {
     static final int BED_WIDTH  = imgW;
     static final int BED_HEIGHT = imgH;
 
-    public BedDialog(JFrame owner) {
-        super(owner);
+    public BedDialog() {  // <-- Window instead of JFrame
         setUndecorated(true);
         setBackground(new Color(0, 0, 0, 0));
         setFocusable(false);
@@ -32,11 +30,6 @@ public class BedDialog extends JDialog {
         setLocation(getBedScreenPosition());
     }
 
-    /**
-     * Single source of truth for where the bed sits on screen.
-     * Uses the usable screen area which already excludes the taskbar.
-     * Do NOT subtract insets again.
-     */
     public static Point getBedScreenPosition() {
         Rectangle usable = Theme.getUsableScreen();
 
@@ -71,11 +64,7 @@ public class BedDialog extends JDialog {
 
         return new Point(x, y);
     }
-    /**
-     * Returns the screen position the pet dialog should snap to
-     * so the cat sprite sits correctly aligned over the bed sprite.
-     * Adjust the offsets to fine-tune alignment.
-     */
+
     public static Point getCatSnapPosition() {
         Point bedPos = getBedScreenPosition();
 
@@ -114,8 +103,6 @@ public class BedDialog extends JDialog {
         );
     }
 
-    // ── Inner panel that draws the bed ───────────────────────────
-
     private static class BedPanel extends JPanel {
 
         private final BufferedImage bedImage;
@@ -132,7 +119,6 @@ public class BedDialog extends JDialog {
             if (bedImage != null) {
                 g.drawImage(bedImage, 12, 11, getWidth(), getHeight(), this);
             }
-
         }
 
         private static BufferedImage loadBedImage() {

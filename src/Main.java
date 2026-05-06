@@ -27,8 +27,7 @@ public class Main {
     public static void main(String[] args) {
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception var2) {
-        }
+        } catch (Exception e) {}
 
         SwingUtilities.invokeLater(() -> {
             if (!SaveManager.saveExists()) {
@@ -41,11 +40,13 @@ public class Main {
             }
 
             PetStats currentStats = SaveManager.load();
+
             JFrame hiddenOwner = new JFrame();
             hiddenOwner.setUndecorated(true);
             hiddenOwner.setSize(0, 0);
             hiddenOwner.setType(Type.UTILITY);
             hiddenOwner.setVisible(true);
+
             Image icon = loadAppIcon();
             hiddenOwner.setIconImages(List.of(
                     icon.getScaledInstance(16,  16,  4),
@@ -54,11 +55,14 @@ public class Main {
                     icon.getScaledInstance(128, 128, 4)
             ));
 
-            BedDialog bed = new BedDialog(hiddenOwner);
-            bed.positionAtBottom();
-            bed.setAlwaysOnTop(true);
-            bed.setVisible(true);
+            // dialog is created first so it can own bed
 
+
+            // bed is now owned by dialog — so dialog always renders above it
+            BedDialog bed = new BedDialog();
+            bed.positionAtBottom();
+            bed.setAlwaysOnTop(false);
+            bed.setVisible(true);
             JDialog dialog = new JDialog(hiddenOwner);
             dialog.setUndecorated(true);
             dialog.setBackground(new Color(0, 0, 0, 0));
@@ -95,9 +99,8 @@ public class Main {
         panel.addMouseListener(new MouseAdapter() {
             public void mousePressed(MouseEvent e) {
                 if (!panel.isOverMenuButton(e.getPoint())) {
-                    panel.setDragging(true); // resize happens first
+                    panel.setDragging(true);
                     Point dialogLoc = dialog.getLocation();
-                    // capture offset AFTER resize so cursor stays anchored
                     dragOffset[0] = new Point(e.getXOnScreen() - dialogLoc.x, e.getYOnScreen() - dialogLoc.y);
                     active[0] = true;
                 }
@@ -126,8 +129,7 @@ public class Main {
         for (String path : new String[]{"images/icon.png", "images/yarn_icon.png"}) {
             try {
                 return ImageIO.read(new File(path));
-            } catch (IOException var5) {
-            }
+            } catch (IOException e) {}
         }
         return createFallbackIcon();
     }
