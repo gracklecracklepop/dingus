@@ -89,6 +89,7 @@ public class PetPanel extends JPanel {
             dialog.setSize(dialog.getWidth(), preDragHeight + 100);
             dialog.setLocation(dialog.getX(), dialog.getY() - 100);
             dialog.setResizable(false);
+            menuToggleButton.setVisible(false);
             System.out.println("AFTER resize: " + dialog.getWidth() + "x" + dialog.getHeight());
             // ... rest unchanged
 
@@ -145,55 +146,92 @@ public class PetPanel extends JPanel {
 
     private void toggleMenu() {
         menuVisible = !menuVisible;
+
         if (menuVisible) {
-            menuToggleButton.setFont(Theme.emojiFont(40));
-            menuToggleButton.setText("❌");
             dialog.setSize(Main.PET_WIDTH + Theme.MENU_WIDTH, Main.PET_HEIGHT);
             dialog.setLocation(dialog.getX() - Theme.MENU_WIDTH, dialog.getY());
             dialog.add(menu.getPanel(), BorderLayout.WEST);
+            menuToggleButton.setToolTipText("Close menu");
         } else {
-            menuToggleButton.setFont(Theme.emojiFont(40));
-            menuToggleButton.setText("🤍");
             dialog.remove(menu.getPanel());
             dialog.setSize(Main.PET_WIDTH, Main.PET_HEIGHT);
             dialog.setLocation(dialog.getX() + Theme.MENU_WIDTH, dialog.getY());
+            menuToggleButton.setToolTipText("Open menu");
         }
+
+        menuToggleButton.repaint();   // <-- redraw icon (power vs X)
         dialog.revalidate();
         dialog.repaint();
     }
-
     private JButton buildToggleButton() {
-        JButton btn = new JButton("🤍") {
+        JButton btn = new JButton() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,  RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-                Color bg = getModel().isPressed()  ? new Color(60, 60, 60, 220)
-                        : getModel().isRollover() ? new Color(80, 80, 80, 220)
-                        :                           new Color(50, 50, 50, 200);
-                g2.setColor(bg);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
-                g2.setColor(new Color(100, 100, 100));
-                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+                // background color by state
+                Color bg = Theme.BTN_DEFAULT;
+                if (!isEnabled()) bg = Theme.BTN_DISABLED;
+                else if (getModel().isPressed()) bg = Theme.BTN_PRESSED;
+                else if (getModel().isRollover()) bg = Theme.BTN_HOVER;
 
-                g2.setColor(Color.WHITE);
-                g2.setFont(Theme.emojiFont(16));
-                FontMetrics fm = g2.getFontMetrics();
-                g2.drawString(getText(),
-                        (getWidth()  - fm.stringWidth(getText())) / 2,
-                        (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
+                // button body
+                int r = 10;
+                g2.setColor(bg);
+                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, r, r);
+
+                // ink outline
+                g2.setColor(Theme.BG_INPUT_BORDER);
+                g2.setStroke(new BasicStroke(2f));
+                g2.drawRoundRect(0, 0, getWidth() - 2, getHeight() - 2, r, r);
+
+                // icon (power when closed, X when open)
+                g2.setColor(Theme.TEXT_PRIMARY);
+                g2.setStroke(new BasicStroke(2.4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+                int pad = 7;
+                int cx = getWidth() / 2;
+                int cy = getHeight() / 2;
+
+                if (!menuVisible) {
+                    // macOS-ish power icon: broken circle + stem
+                    int rr = (Math.min(getWidth(), getHeight()) - pad * 2) / 2;
+                    int d  = rr * 2;
+
+                    // arc with a gap at the top
+                    g2.drawArc(cx - rr, cy - rr + 1, d, d, 35, 290);
+
+                    // stem
+                    g2.drawLine(cx, cy - rr - 1, cx, cy - 2);
+                } else {
+                    // close X icon
+                    int x1 = pad, y1 = pad;
+                    int x2 = getWidth() - pad;
+                    int y2 = getHeight() - pad;
+                    g2.drawLine(x1, y1, x2, y2);
+                    g2.drawLine(x2, y1, x1, y2);
+                }
+
                 g2.dispose();
             }
         };
+
         btn.setBorderPainted(false);
         btn.setContentAreaFilled(false);
         btn.setFocusPainted(false);
+        btn.setOpaque(false);
+        btn.setRolloverEnabled(true);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setToolTipText("Open menu");
+
         btn.addActionListener(e -> toggleMenu());
+
+        // keep your drag logic safe (consume press)
         btn.addMouseListener(new MouseAdapter() {
             @Override public void mousePressed(MouseEvent e) { e.consume(); }
         });
+
         return btn;
     }
 

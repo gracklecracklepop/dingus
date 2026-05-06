@@ -29,12 +29,14 @@ public class SettingsDialog extends JDialog {
         JPanel mainContainer = new JPanel(new BorderLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(Theme.BG_MAIN);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), Theme.CORNER_RADIUS, Theme.CORNER_RADIUS);
+                Theme.paintMacWindow(g2, getWidth(), getHeight(), "SETTINGS");
                 g2.dispose();
             }
+
         };
+        mainContainer.setBorder(BorderFactory.createEmptyBorder(
+                Theme.TITLEBAR_HEIGHT + 12, 16, 16, 16
+        ));
         mainContainer.setOpaque(false);
         mainContainer.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
@@ -220,9 +222,11 @@ public class SettingsDialog extends JDialog {
         field.setSelectionColor(Theme.BG_DROPDOWN_SELECTED);
         field.setSelectedTextColor(Theme.TEXT_PRIMARY);
         field.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(Theme.BG_INPUT_BORDER, 1),
+                BorderFactory.createLineBorder(Theme.BG_INPUT_BORDER, 2),
                 BorderFactory.createEmptyBorder(5, 8, 5, 8)
         ));
+
+//        cb.setBorder(BorderFactory.createLineBorder(Theme.BG_INPUT_BORDER, 2));
         return field;
     }
 
