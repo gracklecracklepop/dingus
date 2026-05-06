@@ -7,6 +7,7 @@ import java.awt.event.*;
 public class SettingsDialog extends JDialog {
 
     private final PetStats stats;
+    private final Runnable onSaved = null;
     private CardLayout cardLayout = new CardLayout();
     private JPanel cardPanel = new JPanel(cardLayout);
 
@@ -15,15 +16,16 @@ public class SettingsDialog extends JDialog {
         Theme.applyUIManagerDefaults();
     }
 
-    public SettingsDialog(PetStats stats) {
+    public SettingsDialog(PetStats stats, Runnable onSaved) {
         this.stats = stats;
+        this.onSaved = onSaved;
 
         setTitle("Settings");
         setModal(true);
         setSize(Theme.WIZARD_WIDTH, Theme.WIZARD_HEIGHT);
         setLocationRelativeTo(null);
         setUndecorated(true);
-        setType(Window.Type.UTILITY);
+        setType(Type.UTILITY);
         setBackground(new Color(0, 0, 0, 0));
 
         JPanel mainContainer = new JPanel(new BorderLayout()) {
@@ -182,6 +184,9 @@ public class SettingsDialog extends JDialog {
             stats.setSpriteColor((String) colorBox.getSelectedItem());
             SaveManager.save(stats);
 
+            if (onSaved != null) onSaved.run();
+
+
             saveBtn.setText("✓ Saved!");
             saveBtn.setBackground(Theme.ACCENT_SUCCESS);
             new Timer(1500, evt -> {
@@ -205,6 +210,8 @@ public class SettingsDialog extends JDialog {
         l.setFont(Theme.font(Theme.FONT_SIZE_LABEL));
         return l;
     }
+
+
 
     private JTextField createStyledTextField(String defaultText) {
         JTextField field = new JTextField(defaultText) {

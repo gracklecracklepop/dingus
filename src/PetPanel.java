@@ -234,6 +234,18 @@ public class PetPanel extends JPanel {
 
         return btn;
     }
+    public void applyAppearanceFromStats(PetStats stats) {
+        setimages(stats.getSpriteColor());
+
+        // keep the current “state” image consistent
+        if (currentImage == bedImage) {
+            currentImage = bedImage;
+        } else {
+            currentImage = normalImage;
+        }
+        repaint();
+    }
+
 
     private static BufferedImage loadImage(String path) {
         try { return ImageIO.read(new File(path)); }

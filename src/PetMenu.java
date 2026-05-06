@@ -9,6 +9,9 @@ import java.time.Instant;
 
 public class PetMenu {
 
+    private JLabel nameLabel;        // name above bars
+    private JPanel mainMenuPanel;    // optional if you want to rebuild
+
     private final JPanel panel;
     private final PetStats stats;
     private final JDialog hostDialog;
@@ -245,6 +248,22 @@ public class PetMenu {
         wrapper.add(body, BorderLayout.CENTER);
 
         return wrapper;
+    }
+
+    public void refreshFromStats() {
+        // name
+        String name = stats.getName();
+        if (name == null || name.isBlank()) name = "DINGUS";
+        if (nameLabel != null) nameLabel.setText("🐱 " + name);
+
+        // coins (if needed)
+        if (mainMenuCoinLabel != null) mainMenuCoinLabel.setText("🪙 " + stats.getCoins());
+
+        // bars (if you want immediate reflect)
+        updateLiveStats();
+
+        panel.revalidate();
+        panel.repaint();
     }
 
     private JPanel buildTitleBar() {
