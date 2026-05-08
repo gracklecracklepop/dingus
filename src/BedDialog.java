@@ -7,22 +7,21 @@ import java.io.IOException;
 
 public class BedDialog extends JDialog {
 
-    static Toolkit toolkit = Toolkit.getDefaultToolkit();
-    static Dimension screenSize = toolkit.getScreenSize();
-
-    public static int imgW = (int) (screenSize.getWidth()  / 5);
-    public static int imgH = (int) (screenSize.getHeight() / 5);
-
-    static final int BED_WIDTH  = imgW;
-    static final int BED_HEIGHT = imgH;
+    // Match the "bed area" in PetPanel (baseY = 80)
+    public static final int BED_WIDTH  = Main.PET_WIDTH;
+    public static final int BED_HEIGHT = Main.PET_HEIGHT - 80;
 
     private final BedPanel panel;
 
     public BedDialog() {
         setUndecorated(true);
         setBackground(new Color(0, 0, 0, 0));
-        setFocusable(false);
+
+        // overlay sticker behavior
+        setType(Window.Type.POPUP);
+        setAlwaysOnTop(true);
         setFocusableWindowState(false);
+        setAutoRequestFocus(false);
 
         AWTUtilities_setWindowOpaque(this);
 
@@ -35,6 +34,16 @@ public class BedDialog extends JDialog {
         panel.setImage(img);
     }
 
+    /** Call AFTER setVisible(true) to bump above taskbar/topmost layers. */
+    public void bumpTopmost() {
+        try {
+            setAlwaysOnTop(false);
+            setAlwaysOnTop(true);
+        } catch (Exception ignored) {}
+        toFront();
+        repaint();
+    }
+
     public void positionAtBottom() {
         setLocation(getBedScreenPosition());
     }
@@ -45,30 +54,28 @@ public class BedDialog extends JDialog {
             return new Point(s.getBedX(), s.getBedY());
         }
 
-        // fallback: old bottom-right placement
-        Rectangle usable = Theme.getUsableScreen();
-        int x = usable.x + usable.width  - BED_WIDTH;
-        int y = usable.y + usable.height - BED_HEIGHT;
+        // bottom-right of FULL screen (can overlap taskbar)
+        GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+        Rectangle screen = gd.getDefaultConfiguration().getBounds();
+
+        int x = screen.x + screen.width  - BED_WIDTH;
+        int y = screen.y + screen.height - BED_HEIGHT;
         return new Point(x, y);
     }
 
-    /** Pet spawns relative to bed (centered). */
+    /** Pet snaps relative to bed. */
     public static Point getCatSnapPosition() {
         Point bedPos = getBedScreenPosition();
 
-        int snapX = bedPos.x + (BED_WIDTH - Main.PET_WIDTH) / 2;
-        int snapY = bedPos.y - Main.PET_HEIGHT + BED_HEIGHT;
+        int snapX = bedPos.x; // since BED_WIDTH == PET_WIDTH
+        int snapY = bedPos.y - Main.PET_HEIGHT + BED_HEIGHT; // aligns bed-area in pet window
 
-        // small tweak constants if you want later
-        int tweakX = 0;
-        int tweakY = 0;
-
-        return new Point(snapX + tweakX, snapY + tweakY);
+        return new Point(snapX, snapY);
     }
 
     // ─────────────────────────────────────────────────────────────
 
-    private class BedPanel extends JPanel {
+    private static class BedPanel extends JPanel {
         private BufferedImage bedImage;
 
         BedPanel() {
@@ -87,15 +94,36 @@ public class BedDialog extends JDialog {
             if (bedImage == null) return;
 
             Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-            g2.drawImage(bedImage, 0, 0, getWidth(), getHeight(), null);
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                    RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+
+            // NO STRETCH: draw contain (aspect preserved)
+            drawContain(g2, bedImage, new Rectangle(0, 0, getWidth(), getHeight()));
+
             g2.dispose();
+        }
+
+        private static BufferedImage loadImage(String path) {
+            try { return ImageIO.read(new File(path)); }
+            catch (IOException e) { return null; }
         }
     }
 
-    private static BufferedImage loadImage(String path) {
-        try { return ImageIO.read(new File(path)); }
-        catch (IOException e) { return null; }
+    private static void drawContain(Graphics2D g2, BufferedImage img, Rectangle box) {
+        int iw = img.getWidth();
+        int ih = img.getHeight();
+
+        double sx = box.width  / (double) iw;
+        double sy = box.height / (double) ih;
+        double s = Math.min(sx, sy);
+
+        int dw = (int) Math.round(iw * s);
+        int dh = (int) Math.round(ih * s);
+
+        int dx = box.x + (box.width  - dw) / 2;
+        int dy = box.y + (box.height - dh) / 2;
+
+        g2.drawImage(img, dx, dy, dw, dh, null);
     }
 
     private static void AWTUtilities_setWindowOpaque(Window w) {

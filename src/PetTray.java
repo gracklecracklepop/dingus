@@ -7,6 +7,7 @@ public class PetTray {
     private static boolean  visible = true;
     private static Window   bed;
     private static Window   petWindow;
+    private static boolean sendMessage;
 
     public static void setup(Window window, Window bedWindow, Image icon) {
         bed = bedWindow;
@@ -26,7 +27,7 @@ public class PetTray {
 
         PopupMenu popup = new PopupMenu();
         addItem(popup, "Show Pet",  () -> show(window));
-        addItem(popup, "Hide Pet",  () -> hide(window));
+        addItem(popup, "Hide Pet",  () -> hide(window, false));
         popup.addSeparator();
         addItem(popup, "Feed",  () -> TrayNotifier.showNotification("Dingus", "Yummy! Thanks for the food!"));
         addItem(popup, "Play",  () -> TrayNotifier.showNotification("Dingus", "Let's play!"));
@@ -39,7 +40,7 @@ public class PetTray {
         trayIcon.addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) {
-                    if (visible) hide(window); else show(window);
+                    if (visible) hide(window, false); else show(window);
                 }
             }
         });
@@ -55,12 +56,13 @@ public class PetTray {
         }
     }
 
-    public static void hide(Window window) {
+    public static void hide(Window window, boolean sendMessage) {
+        PetTray.sendMessage = sendMessage;
         window.setVisible(false);
         if (bed != null) bed.setVisible(false);
         visible = false;
-
-        TrayNotifier.showNotification("Dingus", "I'm hiding in the tray! Double-click to bring me back.");
+        if(sendMessage){
+        TrayNotifier.showNotification("Dingus", "I'm hiding in the tray! Double-click to bring me back.");}
     }
 
     public static void show(Window window) {

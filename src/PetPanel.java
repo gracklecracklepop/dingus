@@ -15,8 +15,8 @@ public class PetPanel extends JPanel {
 
     private BufferedImage normalImage;
     private BufferedImage dragImage;
-    private BufferedImage bedImage;   // cat-in-bed sprite
-    private BufferedImage bedAlone;   // bed-only sprite
+    private BufferedImage bedImage;   // cat in bed sprite
+    private BufferedImage bedAlone;   // bed only sprite
     private BufferedImage currentImage;
 
     private final JButton menuToggleButton;
@@ -27,7 +27,7 @@ public class PetPanel extends JPanel {
     private BedDialog bed;
 
     private boolean isDragging = false;
-    private boolean isInBed = false;     // track bed state (don’t rely on image reference equality)
+    private boolean isInBed = true;     // START IN BED
     private int preDragHeight = -1;
 
     private static final Cursor CURSOR_DEFAULT = Cursor.getDefaultCursor();
@@ -36,11 +36,12 @@ public class PetPanel extends JPanel {
         this.dialog = dialog;
         setLayout(null);
 
-        // Load ONCE and share
         this.stats = SaveManager.load();
 
         setimages(stats.getSpriteColor());
-        currentImage = normalImage;
+
+        // First image on execution: cat in bed
+        currentImage = bedImage;
 
         menu = new PetMenu(stats, dialog, () -> applyAppearanceFromStats(stats));
 
@@ -49,17 +50,14 @@ public class PetPanel extends JPanel {
         add(menuToggleButton);
     }
 
-    // ── Public API ──────────────────────────────────────────────
-
     public void setBedDialog(BedDialog bed) {
         this.bed = bed;
 
-        // show correct bed immediately (bedAlone depends on current color)
+        // bed-alone sprite based on current color
         bed.setBedSprite(bedAlone);
-
-        // IMPORTANT: don’t force the cat into bed at startup
-        // (your previous version did: currentImage = bedImage; bed.setVisible(false);)
         bed.positionAtBottom();
+
+        // since we start in bed, hide the bed-alone window
         bed.setVisible(!isInBed);
 
         repaint();
@@ -67,11 +65,8 @@ public class PetPanel extends JPanel {
 
     public void applyAppearanceFromStats(PetStats s) {
         setimages(s.getSpriteColor());
-
-        // update bed-only sprite immediately
         if (bed != null) bed.setBedSprite(bedAlone);
 
-        // preserve current state (dragging / in bed / normal)
         if (isDragging) currentImage = (dragImage != null) ? dragImage : normalImage;
         else if (isInBed) currentImage = bedImage;
         else currentImage = normalImage;
@@ -107,12 +102,9 @@ public class PetPanel extends JPanel {
             }
         }
 
-        // Safety fallbacks if any sprite missing
         if (normalImage == null && dragImage != null) normalImage = dragImage;
         if (dragImage == null) dragImage = normalImage;
         if (bedImage == null) bedImage = normalImage;
-
-        // bedAlone fallback (so bed never disappears if a file is missing)
         if (bedAlone == null) bedAlone = loadImage("dingus - Copy/orangebed.png");
     }
 
@@ -122,11 +114,10 @@ public class PetPanel extends JPanel {
         if (dragging) {
             preDragHeight = dialog.getHeight();
 
-            // picking up the cat: it is no longer “in bed”
+            // picking up = not in bed
             isInBed = false;
             if (bed != null) bed.setVisible(true);
 
-            // Switch to drag sprite
             currentImage = (dragImage != null) ? dragImage : normalImage;
 
             dialog.setResizable(true);
@@ -145,17 +136,12 @@ public class PetPanel extends JPanel {
                 preDragHeight = -1;
             }
 
-            // NEW: check if we dropped onto a grass window (in-app GrassDialog)
-            // (Only works if your Play opens GrassDialog, not external browser tabs.)
-            try {
-                menu.checkGrassDrop(dialog.getBounds());
-            } catch (Throwable ignored) {}
+            try { menu.checkGrassDrop(dialog.getBounds()); } catch (Throwable ignored) {}
 
-            // Then do bed snapping logic
             if (isNearBed()) {
                 snapToBed();
                 isInBed = true;
-                currentImage = bedImage;   // cat-in-bed sprite
+                currentImage = bedImage;
                 if (bed != null) bed.setVisible(false);
             } else {
                 isInBed = false;
@@ -175,8 +161,6 @@ public class PetPanel extends JPanel {
                 && p.y >= 85 && p.y <= 85 + BUTTON_SIZE;
     }
 
-    // ── Bed Detection & Snapping ─────────────────────────────────
-
     private boolean isNearBed() {
         if (bed == null) return false;
         Rectangle bedBounds = bed.getBounds();
@@ -192,8 +176,6 @@ public class PetPanel extends JPanel {
     private void snapToBed() {
         dialog.setLocation(BedDialog.getCatSnapPosition());
     }
-
-    // ── Menu toggle (power / X) ──────────────────────────────────
 
     private void toggleMenu() {
         menuVisible = !menuVisible;
@@ -278,11 +260,8 @@ public class PetPanel extends JPanel {
         catch (IOException e) { System.err.println("Missing image: " + path); return null; }
     }
 
-    // ── Drawing helpers (no stretching) ──────────────────────────
-
-    private static void drawImageAspect(Graphics2D g2, BufferedImage img, Rectangle box) {
+    private static void drawContain(Graphics2D g2, BufferedImage img, Rectangle box) {
         if (img == null) return;
-
         int iw = img.getWidth();
         int ih = img.getHeight();
 
@@ -299,25 +278,33 @@ public class PetPanel extends JPanel {
         g2.drawImage(img, dx, dy, dw, dh, null);
     }
 
+    private static void drawImageAspect(Graphics2D g2, BufferedImage img, Rectangle box) {
+        // same as contain
+        drawContain(g2, img, box);
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
         Graphics2D g2 = (Graphics2D) g.create();
-
-        // Pixel-crisp scaling
-        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
 
         int baseY = 80;
         int dragYOffset = 100;
 
-        Rectangle spriteBox = isDragging
-                ? new Rectangle(0, baseY + dragYOffset, getWidth(), BedDialog.imgH)
-                : new Rectangle(0, baseY, getWidth(), BedDialog.imgH);
-
-        drawImageAspect(g2, currentImage, spriteBox);
+        if (isDragging) {
+            Rectangle box = new Rectangle(0, baseY + dragYOffset, getWidth(), BedDialog.BED_HEIGHT);
+            drawImageAspect(g2, currentImage, box);
+        } else if (isInBed) {
+            // NO STRETCH: draw contain into same bed-area box as the bed-only window
+            Rectangle box = new Rectangle(0, baseY, BedDialog.BED_WIDTH, BedDialog.BED_HEIGHT);
+            drawContain(g2, currentImage, box);
+        } else {
+            Rectangle box = new Rectangle(0, baseY, getWidth(), BedDialog.BED_HEIGHT);
+            drawImageAspect(g2, currentImage, box);
+        }
 
         g2.dispose();
     }

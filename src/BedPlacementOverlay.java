@@ -5,7 +5,7 @@ import java.awt.image.BufferedImage;
 
 public class BedPlacementOverlay extends JDialog {
 
-    private final Rectangle usable;
+    private final Rectangle screenBounds;
     private final BufferedImage bedImg;
     private final int bedW, bedH;
 
@@ -22,7 +22,7 @@ public class BedPlacementOverlay extends JDialog {
 
     private BedPlacementOverlay(Window owner, BufferedImage bedImg, int bedW, int bedH) {
         super(owner);
-        this.usable = Theme.getUsableScreen();
+        this.screenBounds = getAllScreenBounds();   // full bounds incl. taskbar
         this.bedImg = bedImg;
         this.bedW = bedW;
         this.bedH = bedH;
@@ -31,7 +31,7 @@ public class BedPlacementOverlay extends JDialog {
         setModal(true);
         setAlwaysOnTop(true);
         setBackground(new Color(0, 0, 0, 0));
-        setBounds(usable);
+        setBounds(screenBounds);
 
         JPanel root = new JPanel(null) {
             @Override protected void paintComponent(Graphics g) {
@@ -77,11 +77,11 @@ public class BedPlacementOverlay extends JDialog {
                     if (bedImg != null) {
                         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                                 RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-                        g2.drawImage(bedImg, r.x - usable.x, r.y - usable.y, r.width, r.height, null);
+                        g2.drawImage(bedImg, r.x - screenBounds.x, r.y - screenBounds.y, r.width, r.height, null);
                     } else {
                         // fallback rectangle if image missing
                         g2.setColor(new Color(Theme.BG_INPUT.getRed(), Theme.BG_INPUT.getGreen(), Theme.BG_INPUT.getBlue(), 220));
-                        g2.fillRect(r.x - usable.x, r.y - usable.y, r.width, r.height);
+                        g2.fillRect(r.x - screenBounds.x, r.y - screenBounds.y, r.width, r.height);
                     }
 
                     g2.setComposite(old);
@@ -89,7 +89,7 @@ public class BedPlacementOverlay extends JDialog {
                     // ink outline around preview
                     g2.setColor(Theme.BG_INPUT_BORDER);
                     g2.setStroke(new BasicStroke(2));
-                    g2.drawRect(r.x - usable.x, r.y - usable.y, r.width - 1, r.height - 1);
+                    g2.drawRect(r.x - screenBounds.x, r.y - screenBounds.y, r.width - 1, r.height - 1);
                 }
 
                 g2.dispose();
@@ -169,6 +169,15 @@ public class BedPlacementOverlay extends JDialog {
         });
     }
 
+    private static Rectangle getAllScreenBounds() {
+        Rectangle all = new Rectangle();
+        GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        for (GraphicsDevice gd : ge.getScreenDevices()) {
+            all = all.union(gd.getDefaultConfiguration().getBounds());
+        }
+        return all;
+    }
+
     private void styleOverlayButton(JButton b) {
         b.setBorderPainted(true);
         b.setContentAreaFilled(true);
@@ -194,8 +203,8 @@ public class BedPlacementOverlay extends JDialog {
         int y = mouseScreen.y - bedH / 2;
 
         // Clamp into usable area so it never ends up off-screen
-        x = Math.max(usable.x, Math.min(usable.x + usable.width - bedW, x));
-        y = Math.max(usable.y, Math.min(usable.y + usable.height - bedH, y));
+        x = Math.max(screenBounds.x, Math.min(screenBounds.x + screenBounds.width - bedW, x));
+        y = Math.max(screenBounds.y, Math.min(screenBounds.y + screenBounds.height - bedH, y));
 
         return new Rectangle(x, y, bedW, bedH);
     }

@@ -211,7 +211,7 @@ public class PetMenu {
         final int startEnergy = stats.getEnergy();
         final int totalSeconds = minutes * 60;
 
-        PetTray.hide(hostDialog);
+        PetTray.hide(hostDialog, false);
 
         final int[] elapsed = {0};
         sleepTimer = new Timer(1000, e -> {
@@ -457,7 +457,7 @@ public class PetMenu {
         return b;
     }
 
-    private void hidePet() { PetTray.hide(hostDialog); }
+    private void hidePet() { PetTray.hide(hostDialog, true); }
 
     private void exitApp() {
         save();
