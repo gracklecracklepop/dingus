@@ -57,9 +57,9 @@ public class Theme {
     // ██████████████████████████  SHOP COLORS  █████████████████████████████████
     // ═══════════════════════════════════════════════════════════════════════════
 
-    public static final Color BG_SHOP_SLOT         = new Color(50, 50, 50);
-    public static final Color BG_SHOP_SLOT_BORDER  = new Color(70, 70, 70);
-    public static final Color BG_SHOP_BUY          = new Color(70, 70, 70);
+    public static final Color BG_SHOP_SLOT = Theme.BG_MAIN;   // cream
+    public static final Color BG_SHOP_BUY  = Theme.BTN_DEFAULT;
+    public static final Color BG_SHOP_SLOT_BORDER = Theme.BG_INPUT_BORDER; // ink
     public static final Color BG_SHOP_OWNED        = new Color(100, 150, 100);
     public static final Color BG_SHOP_NO_FUNDS     = new Color(150, 50, 50);
 

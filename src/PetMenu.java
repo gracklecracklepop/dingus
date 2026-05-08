@@ -9,12 +9,10 @@ import java.time.Instant;
 
 public class PetMenu {
 
-    private JLabel nameLabel;        // name above bars
-    private JPanel mainMenuPanel;    // optional if you want to rebuild
-
     private final JPanel panel;
     private final PetStats stats;
     private final JDialog hostDialog;
+    private final Runnable onExternalStatsChanged; // e.g. update pet sprite
 
     private CardLayout cardLayout;
     private JPanel container;
@@ -23,7 +21,8 @@ public class PetMenu {
     private JProgressBar hungerBar, happinessBar, energyBar;
     private JLabel hungerLabel, happinessLabel, energyLabel;
 
-    // titlebar coin label (next to traffic lights)
+    // title content
+    private JLabel nameLabel;
     private JLabel mainMenuCoinLabel;
 
     // ── Cooldown tracking ───────────────────────────────────────
@@ -32,11 +31,23 @@ public class PetMenu {
     private JButton feedButton;
     private Timer cooldownTimer;
 
+    // ── Live usage tracking ─────────────────────────────────────
     long ramUse;
     long base;
     private javax.swing.Timer usageTimer;
+
     OperatingSystemMXBean osBean = (OperatingSystemMXBean)
             ManagementFactory.getOperatingSystemMXBean();
+
+    // ── Happiness decay + notifications ─────────────────────────
+    private Timer happinessDecayTimer;
+    private double happinessDecayCarry = 0.0; // keep fractional decay even if stats are ints
+    private boolean happinessWarned = false;
+    private boolean energyWarned = false;
+    private boolean hungerWarned = false;
+
+    // ── Sleep (timed hide + recharge) ───────────────────────────
+    private Timer sleepTimer;
 
     private static final String[] GRASS_URLS = {
             "https://www.thisoldhouse.com/wp-content/uploads/2020/08/iStock_511747120-scaled.jpg",
@@ -45,9 +56,13 @@ public class PetMenu {
             "https://www.monrovia.com/media/catalog/product/cache/7b381462074fb6871f01f9faa7ed2e11/r/e/rest_2_2_2226.webp"
     };
 
-    public PetMenu(PetStats stats, JDialog dialog) {
+    public PetMenu(PetStats stats, JDialog dialog, Runnable onExternalStatsChanged) {
+        // ensure tray notifier is ready even before PetTray.setup binds
+        TrayNotifier.ensureInitialized();
+
         this.stats = stats;
         this.hostDialog = dialog;
+        this.onExternalStatsChanged = onExternalStatsChanged;
 
         cardLayout = new CardLayout();
         container  = new JPanel(cardLayout);
@@ -65,23 +80,49 @@ public class PetMenu {
 
         base = stats.getBaseRam();
         startUsageTimer();
+        startHappinessDecayTimer();
+
+        // check thresholds immediately on open
+        maybeNotifyThresholds();
     }
 
     public JPanel getPanel() { return panel; }
 
-    // ───────────────────────── RAM usage hooks (unchanged) ─────────────────────
+    // ── External refresh after Settings save ─────────────────────
+
+    public void refreshFromStats() {
+        if (nameLabel != null) {
+            String name = stats.getName();
+            if (name == null || name.isBlank()) name = "DINGUS";
+            nameLabel.setText(ellipsizeMixed("🐱 " + name, Theme.MENU_WIDTH - 60, 15));
+        }
+
+        if (mainMenuCoinLabel != null) {
+            mainMenuCoinLabel.setText("🪙 " + stats.getCoins());
+        }
+
+        updateLiveStats();
+        panel.revalidate();
+        panel.repaint();
+    }
+
+    // ───────────────────────── RAM usage hooks ─────────────────────────
 
     public void usageAdd() throws InterruptedException {
         ramUse = ramUsage.runRamLiveMode((com.sun.management.OperatingSystemMXBean) osBean);
-        stats.addHunger(((double)(ramUse - base)) / 1000000);
+        stats.addHunger(((double)(ramUse - base)) / 1000000.0);
         updateLiveStats();
+        maybeNotifyThresholds();
     }
 
     public void startUsageTimer() {
         if (usageTimer != null) usageTimer.stop();
         usageTimer = new javax.swing.Timer(1000, e -> {
             try { usageAdd(); }
-            catch (InterruptedException ex) { throw new RuntimeException(ex); }
+            catch (InterruptedException ignored) {
+            } catch (RuntimeException ex) {
+                ex.printStackTrace();
+            }
         });
         usageTimer.start();
     }
@@ -91,6 +132,107 @@ public class PetMenu {
             usageTimer.stop();
             usageTimer = null;
         }
+    }
+
+    // ── Happiness decay (3 hours baseline, stronger when RAM delta is high) ─────
+
+    private void startHappinessDecayTimer() {
+        if (happinessDecayTimer != null) happinessDecayTimer.stop();
+
+        happinessDecayTimer = new Timer(60_000, e -> {
+            double baseLossPerMin = 30.0 / 180.0;
+            double delta = Math.max(0, (double) ramUse - (double) base);
+            double ramFactor = 1.0 + Math.min(2.0, delta / 1500.0);
+
+            double loss = baseLossPerMin * ramFactor;
+
+            happinessDecayCarry += loss;
+            int dec = (int) Math.floor(happinessDecayCarry);
+            if (dec > 0) {
+                stats.addHappiness(-dec);
+                happinessDecayCarry -= dec;
+                save();
+                updateLiveStats();
+                maybeNotifyThresholds();
+            }
+        });
+        happinessDecayTimer.start();
+    }
+
+    private void maybeNotifyThresholds() {
+        // Hunger complaint
+        if (stats.getHunger() < 30 && !hungerWarned) {
+            TrayNotifier.showNotification("Dingus", "I'm hungry... feed me!", TrayIcon.MessageType.WARNING);
+            hungerWarned = true;
+        }
+        if (stats.getHunger() >= 40) hungerWarned = false;
+
+        // Happiness complaint
+        if (stats.getHappiness() < 50 && !happinessWarned) {
+            TrayNotifier.showNotification("Dingus", "I'm getting sad... play with me soon!", TrayIcon.MessageType.WARNING);
+            happinessWarned = true;
+        }
+        if (stats.getHappiness() >= 55) happinessWarned = false;
+
+        // Energy complaint
+        if (stats.getEnergy() < 30 && !energyWarned) {
+            TrayNotifier.showNotification("Dingus", "I'm tired... I need sleep.", TrayIcon.MessageType.WARNING);
+            energyWarned = true;
+        }
+        if (stats.getEnergy() >= 40) energyWarned = false;
+    }
+
+    public void checkGrassDrop(Rectangle petBoundsOnScreen) {
+        try {
+            if (GrassDialog.consumeIfIntersect(petBoundsOnScreen)) {
+                stats.addHappiness(30);
+                stats.addEnergy(-10);
+                save();
+                updateLiveStats();
+                maybeNotifyThresholds();
+                TrayNotifier.showNotification("Dingus", "Yay! I touched the grass!", TrayIcon.MessageType.INFO);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    // ── Sleep (themed prompt + timed recharge) ───────────────────
+
+    private void startSleepPrompt() {
+        Integer minutes = SleepDurationDialog.promptMinutes(hostDialog);
+        if (minutes == null) return;
+
+        TrayNotifier.showNotification("Dingus", "Goodnight... see you soon.", TrayIcon.MessageType.INFO);
+        startSleepForMinutes(minutes);
+    }
+
+    private void startSleepForMinutes(int minutes) {
+        if (sleepTimer != null) sleepTimer.stop();
+
+        final int startEnergy = stats.getEnergy();
+        final int totalSeconds = minutes * 60;
+
+        PetTray.hide(hostDialog);
+
+        final int[] elapsed = {0};
+        sleepTimer = new Timer(1000, e -> {
+            elapsed[0]++;
+
+            double t = Math.min(1.0, elapsed[0] / (double) totalSeconds);
+            int newEnergy = (int) Math.round(startEnergy + (100 - startEnergy) * t);
+
+            stats.setEnergy(newEnergy);
+            save();
+
+            if (elapsed[0] >= totalSeconds) {
+                sleepTimer.stop();
+                stats.setEnergy(100);
+                save();
+
+                PetTray.show(hostDialog);
+                TrayNotifier.showNotification("Dingus", "I feel rested!", TrayIcon.MessageType.INFO);
+            }
+        });
+        sleepTimer.start();
     }
 
     // ── Cooldown Helpers ────────────────────────────────────────
@@ -124,51 +266,42 @@ public class PetMenu {
         feedButton.repaint();
     }
 
-    // ── Main Menu (mac titlebar + traffic buttons + coins) ─────────────────────
+    // ── Main Menu ───────────────────────────────────────────────
 
     private JPanel buildMainMenu() {
         JPanel wrapper = new JPanel(new BorderLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                // Title is handled by content (name above bars). Keep titlebar clean.
                 Theme.paintMacWindow(g2, getWidth(), getHeight(), "");
                 g2.dispose();
             }
         };
         wrapper.setOpaque(false);
 
-        // Titlebar overlay (traffic lights + coins)
-        JPanel titleBar = buildTitleBar();
-        wrapper.add(titleBar, BorderLayout.NORTH);
+        JLayeredPane titleBarLayer = buildTitleBarLayer();
+        wrapper.add(titleBarLayer, BorderLayout.NORTH);
 
-        // Body (name row + scroll content)
         JPanel body = new JPanel(new BorderLayout());
         body.setOpaque(false);
         body.setBorder(BorderFactory.createEmptyBorder(10, 12, 12, 12));
 
-        // Name above stat bars (like your old header), ellipsized (no scaling)
         String name = stats.getName();
         if (name == null || name.isBlank()) name = "DINGUS";
-
-        JLabel nameLabel = Theme.mixedLabel(ellipsizeForMenu("🐱 " + name, Theme.MENU_WIDTH - 60, 15),
+        nameLabel = Theme.mixedLabel(ellipsizeMixed("🐱 " + name, Theme.MENU_WIDTH - 60, 15),
                 15, Theme.TEXT_PRIMARY);
-        nameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JPanel nameRow = new JPanel(new BorderLayout());
         nameRow.setOpaque(false);
         nameRow.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
         nameRow.add(nameLabel, BorderLayout.WEST);
-
         body.add(nameRow, BorderLayout.NORTH);
 
-        // Scrollable content
         JPanel content = new JPanel() {
             @Override
             public Dimension getPreferredSize() {
                 Insets in = getInsets();
                 int width = 0;
                 int height = in.top + in.bottom;
-
                 for (Component c : getComponents()) {
                     if (!c.isVisible()) continue;
                     Dimension pref = c.getPreferredSize();
@@ -193,7 +326,6 @@ public class PetMenu {
         content.add(wrapBar(happinessLabel, happinessBar)); content.add(Box.createVerticalStrut(8));
         content.add(wrapBar(energyLabel,    energyBar));    content.add(Box.createVerticalStrut(14));
 
-        // Feed button with cooldown
         feedButton = makeButton("🍖 Feed", () -> {
             if (isFeedOnCooldown()) return;
             stats.addHunger(20);
@@ -203,6 +335,7 @@ public class PetMenu {
             save();
             lastFedTime = Instant.now().toEpochMilli();
             refreshFeedButton();
+            maybeNotifyThresholds();
         });
         content.add(feedButton);
         refreshFeedButton();
@@ -214,23 +347,24 @@ public class PetMenu {
             stats.addCoins(5);
             updateLiveStats();
             save();
-            openRandomGrass();
+            maybeNotifyThresholds();
+            openRandomGrassInApp();
         });
 
-        addButton(content, "😴 Sleep", () -> {
-            stats.addEnergy(10);
-            updateLiveStats();
-            save();
-        });
+        addButton(content, "😴 Sleep", this::startSleepPrompt);
 
-        addButton(content, "🛒 Shop", this::openShopWindow);
+        addButton(content, "🛒 Shop", () -> {
+            ShopDialog shop = new ShopDialog(hostDialog, stats, this::refreshFromStats);
+            shop.setVisible(true);
+        });
 
         addButton(content, "⚙ Settings", () -> {
-            SettingsDialog settings = new SettingsDialog(stats);
+            SettingsDialog settings = new SettingsDialog(hostDialog, stats, () -> {
+                refreshFromStats();
+                if (onExternalStatsChanged != null) onExternalStatsChanged.run();
+            });
             settings.setVisible(true);
         });
-
-        // (Hide/Exit removed here; now handled by traffic lights)
 
         JScrollPane scrollPane = new JScrollPane(content);
         scrollPane.setOpaque(false);
@@ -250,71 +384,69 @@ public class PetMenu {
         return wrapper;
     }
 
-    public void refreshFromStats() {
-        // name
-        String name = stats.getName();
-        if (name == null || name.isBlank()) name = "DINGUS";
-        if (nameLabel != null) nameLabel.setText("🐱 " + name);
-
-        // coins (if needed)
-        if (mainMenuCoinLabel != null) mainMenuCoinLabel.setText("🪙 " + stats.getCoins());
-
-        // bars (if you want immediate reflect)
-        updateLiveStats();
-
-        panel.revalidate();
-        panel.repaint();
-    }
-
-    private JPanel buildTitleBar() {
-        // Must match Theme.paintMacWindow() dot geometry:
+    private JLayeredPane buildTitleBarLayer() {
         final int x0  = 12;
         final int y0  = 9;
         final int dot = 10;
         final int gap = 6;
 
-        JPanel titleBar = new JPanel(null) {
+        JLayeredPane layer = new JLayeredPane() {
             @Override public Dimension getPreferredSize() {
                 return new Dimension(10, Theme.TITLEBAR_HEIGHT);
             }
+
             @Override public void doLayout() {
-                // position coin label tightly after the 3 dots
-                int coinsX = x0 + (dot * 3) + (gap * 2) + 8; // smaller padding = closer to corner
-                Dimension ps = mainMenuCoinLabel.getPreferredSize();
-                mainMenuCoinLabel.setBounds(coinsX, 6, ps.width, ps.height);
+                Component red = getComponentByName("tl_red");
+                Component org = getComponentByName("tl_orange");
+                Component grn = getComponentByName("tl_green");
+                if (red != null) red.setBounds(x0, y0, dot, dot);
+                if (org != null) org.setBounds(x0 + (dot + gap), y0, dot, dot);
+                if (grn != null) grn.setBounds(x0 + 2 * (dot + gap), y0, dot, dot);
+
+                if (mainMenuCoinLabel != null) {
+                    int coinsX = x0 + (dot * 3) + (gap * 2) + 6;
+                    int coinsY = 5;
+
+                    int w = mixedWidth(mainMenuCoinLabel.getText(), Theme.FONT_SIZE_LABEL) + 6;
+                    int h = getFontMetrics(Theme.font(Theme.FONT_SIZE_LABEL)).getHeight() + 2;
+                    mainMenuCoinLabel.setBounds(coinsX, coinsY, w, h);
+                }
+            }
+
+            private Component getComponentByName(String name) {
+                for (Component c : getComponents()) {
+                    if (name.equals(c.getName())) return c;
+                }
+                return null;
             }
         };
-        titleBar.setOpaque(false);
+        layer.setOpaque(false);
 
-        // Invisible clickable hitboxes OVER the dots Theme draws
-        JButton red    = makeTrafficHitbox(this::exitApp, "Exit");
+        JButton red = makeTrafficHitbox(this::exitApp, "Exit");
+        red.setName("tl_red");
+
         JButton orange = makeTrafficHitbox(this::hidePet, "Hide");
-        JButton green  = makeTrafficHitbox(null, null); // no-op, purely for mac look (optional)
+        orange.setName("tl_orange");
 
-        red.setBounds(x0, y0, dot, dot);
-        orange.setBounds(x0 + (dot + gap), y0, dot, dot);
-        green.setBounds(x0 + 2 * (dot + gap), y0, dot, dot);
+        JButton green = makeTrafficHitbox(null, null);
+        green.setName("tl_green");
         green.setEnabled(false);
 
-        titleBar.add(red);
-        titleBar.add(orange);
-        titleBar.add(green);
+        layer.add(red, Integer.valueOf(2));
+        layer.add(orange, Integer.valueOf(2));
+        layer.add(green, Integer.valueOf(2));
 
-        // Coins next to traffic lights (render same as before: uses mixedLabel)
         mainMenuCoinLabel = Theme.mixedLabel("🪙 " + stats.getCoins(),
                 Theme.FONT_SIZE_LABEL, Theme.ACCENT_COINS);
-        titleBar.add(mainMenuCoinLabel);
+        layer.add(mainMenuCoinLabel, Integer.valueOf(1));
 
-        return titleBar;
+        return layer;
     }
 
     private JButton makeTrafficHitbox(Runnable action, String tooltip) {
         JButton b = new JButton() {
-            @Override protected void paintComponent(Graphics g) {
-                // intentionally empty: Theme.paintMacWindow already draws the circles
-            }
+            @Override protected void paintComponent(Graphics g) { }
         };
-        b.setPreferredSize(new Dimension(10, 10));
         b.setBorderPainted(false);
         b.setContentAreaFilled(false);
         b.setFocusPainted(false);
@@ -325,9 +457,7 @@ public class PetMenu {
         return b;
     }
 
-    private void hidePet() {
-        PetTray.hide(hostDialog);
-    }
+    private void hidePet() { PetTray.hide(hostDialog); }
 
     private void exitApp() {
         save();
@@ -345,10 +475,10 @@ public class PetMenu {
             mainMenuCoinLabel.revalidate();
             mainMenuCoinLabel.repaint();
         }
+        panel.repaint();
     }
 
-    // Ellipsis without scaling (uses your existing Theme mixed measurement)
-    private String ellipsizeForMenu(String s, int maxWidth, int fontSize) {
+    private String ellipsizeMixed(String s, int maxWidth, int fontSize) {
         if (s == null) return "";
         BufferedImage img = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2 = img.createGraphics();
@@ -368,152 +498,11 @@ public class PetMenu {
         }
     }
 
-    // ── Shop Menu (unchanged) ───────────────────────────────────
-
-    private void openShopWindow() {
-        JDialog shopDialog = new JDialog();
-        shopDialog.setModal(true);
-        shopDialog.setSize(500, 600);
-        shopDialog.setLocationRelativeTo(null);
-        shopDialog.setUndecorated(true);
-        shopDialog.setType(Window.Type.UTILITY);
-        shopDialog.setBackground(new Color(0, 0, 0, 0));
-
-        JPanel mainContainer = new JPanel(new BorderLayout()) {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                // keep your current shop styling; you can convert this later too
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(Theme.BG_MAIN);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), Theme.CORNER_RADIUS, Theme.CORNER_RADIUS);
-                g2.dispose();
-            }
-        };
-        mainContainer.setOpaque(false);
-        mainContainer.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
-
-        JPanel header = new JPanel(new BorderLayout());
-        header.setOpaque(false);
-        header.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
-
-        JLabel title = Theme.mixedLabel("🛒 Accessory Shop", Theme.FONT_SIZE_HEADING, Theme.TEXT_PRIMARY);
-
-        JLabel shopCoinLabel = Theme.mixedLabel("🪙 " + stats.getCoins(), Theme.FONT_SIZE_LABEL, Theme.ACCENT_COINS);
-
-        JButton closeBtn = makeButton("✖", shopDialog::dispose);
-        closeBtn.setBackground(Theme.BTN_CLOSE);
-        closeBtn.setPreferredSize(new Dimension(40, 30));
-
-        header.add(title,         BorderLayout.WEST);
-        header.add(shopCoinLabel, BorderLayout.CENTER);
-        header.add(closeBtn,      BorderLayout.EAST);
-
-        Point[] offset = {null};
-        header.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override public void mousePressed(java.awt.event.MouseEvent e) { offset[0] = e.getPoint(); }
-        });
-        header.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
-            @Override public void mouseDragged(java.awt.event.MouseEvent e) {
-                if (offset[0] == null) return;
-                Point loc = shopDialog.getLocation();
-                shopDialog.setLocation(
-                        loc.x + e.getX() - offset[0].x,
-                        loc.y + e.getY() - offset[0].y);
-            }
-        });
-
-        mainContainer.add(header, BorderLayout.NORTH);
-
-        JPanel grid = new JPanel(new GridLayout(0, 3, 15, 15));
-        grid.setOpaque(false);
-        grid.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-
-        String[] icons = {"🎩", "👓", "🎀", "👑", "🎒", "🧣", "🎧", "🌸", "🕶️", "🧢"};
-
-        for (int i = 0; i < 21; i++) {
-            grid.add(createShopSlot(icons[i % icons.length], (i + 1) * 10, shopCoinLabel, "acc_" + i));
-        }
-
-        JScrollPane scrollPane = new JScrollPane(grid);
-        scrollPane.setOpaque(false);
-        scrollPane.getViewport().setOpaque(false);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
-        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-
-        JScrollBar bar = scrollPane.getVerticalScrollBar();
-        bar.setPreferredSize(new Dimension(Theme.SCROLLBAR_WIDTH, 0));
-        bar.setUnitIncrement(16);
-        bar.setUI(createThinScrollBarUI());
-
-        mainContainer.add(scrollPane, BorderLayout.CENTER);
-        shopDialog.add(mainContainer);
-        shopDialog.setVisible(true);
-    }
-
-    private JPanel createShopSlot(String icon, int price, JLabel shopCoinLabel, String itemId) {
-        JPanel slot = new JPanel(new BorderLayout(0, 5));
-        slot.setBackground(Theme.BG_SHOP_SLOT);
-        slot.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(Theme.BG_SHOP_SLOT_BORDER, 2),
-                BorderFactory.createEmptyBorder(10, 5, 5, 5)
-        ));
-
-        JLabel iconLabel = new JLabel(icon, SwingConstants.CENTER);
-        iconLabel.setFont(Theme.emojiFont(40));
-        iconLabel.setForeground(Theme.TEXT_PRIMARY);
-
-        JButton buyBtn = makeButton("", null);
-
-        if (stats.ownsAccessory(itemId)) {
-            buyBtn.setText("Owned");
-            buyBtn.setBackground(Theme.BG_SHOP_OWNED);
-            buyBtn.setEnabled(false);
-        } else {
-            buyBtn.setText(price + "");
-            buyBtn.setBackground(Theme.BG_SHOP_BUY);
-            buyBtn.addActionListener(e -> {
-                if (stats.getCoins() >= price) {
-                    stats.addCoins(-price);
-                    stats.addAccessory(itemId);
-                    save();
-                    shopCoinLabel.setText("🪙 " + stats.getCoins());
-                    if (mainMenuCoinLabel != null) mainMenuCoinLabel.setText("🪙 " + stats.getCoins());
-                    buyBtn.setText("Owned");
-                    buyBtn.setBackground(Theme.BG_SHOP_OWNED);
-                    buyBtn.setEnabled(false);
-                } else {
-                    buyBtn.setBackground(Theme.BG_SHOP_NO_FUNDS);
-                    Timer t = new Timer(200, evt -> buyBtn.setBackground(Theme.BG_SHOP_BUY));
-                    t.setRepeats(false); t.start();
-                }
-            });
-        }
-
-        slot.add(iconLabel, BorderLayout.CENTER);
-        slot.add(buyBtn,    BorderLayout.SOUTH);
-        return slot;
-    }
-
-    // ── Update a live bar ───────────────────────────────────────
-
-    private void updateBar(JProgressBar bar, JLabel label, String name, double value) {
-        bar.setValue((int) value);
-        double valueRounded = (double) Math.round(value * 100.0) / 100;
-        label.setText(name + ": " + valueRounded + "%");
-        bar.setForeground(Theme.progressColor((int) value));
-        bar.repaint();
-        label.repaint();
-    }
-
-    // ── Stats Menu ──────────────────────────────────────────────
-
-    private void showStats() {
-        container.remove(statsPanel);
-        statsPanel = buildStatsMenu();
-        container.add(statsPanel, "stats");
-        cardLayout.show(container, "stats");
-        container.revalidate();
-        container.repaint();
+    private int mixedWidth(String s, int fontSize) {
+        BufferedImage img = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = img.createGraphics();
+        try { return Theme.mixedStringWidth(g2, s, fontSize); }
+        finally { g2.dispose(); }
     }
 
     private JPanel buildStatsMenu() {
@@ -535,13 +524,11 @@ public class PetMenu {
         coins.setFont(Theme.emojiFont(Theme.FONT_SIZE_SMALL));
         coins.setAlignmentX(Component.CENTER_ALIGNMENT);
         p.add(coins);
-        p.add(Box.createVerticalStrut(10));
 
+        p.add(Box.createVerticalStrut(10));
         addButton(p, "⬅ Back", () -> cardLayout.show(container, "menu"));
         return p;
     }
-
-    // ── Shared UI ───────────────────────────────────────────────
 
     private JPanel createBasePanel() {
         JPanel p = new JPanel() {
@@ -568,7 +555,7 @@ public class PetMenu {
             @Override public void updateUI() {
                 setUI(new javax.swing.plaf.basic.BasicProgressBarUI() {
                     @Override protected void paintDeterminate(Graphics g, JComponent c) {
-                        int w = (int) (c.getWidth() * ((double) ((JProgressBar) c).getValue() / ((JProgressBar) c).getMaximum()));
+                        int w = (int)(c.getWidth() * ((double)((JProgressBar)c).getValue() / ((JProgressBar)c).getMaximum()));
                         int h = c.getHeight();
                         g.setColor(Theme.PROGRESS_TRACK);
                         g.fillRect(0, 0, c.getWidth(), h);
@@ -682,9 +669,28 @@ public class PetMenu {
 
     private void save() { SaveManager.save(stats); }
 
-    private void openRandomGrass() {
+    private void openRandomGrassInApp() {
+        try {
+            GrassDialog.openRandom(hostDialog, GRASS_URLS);
+            hostDialog.setAlwaysOnTop(true);
+            hostDialog.toFront();
+        } catch (Throwable t) {
+            openRandomGrassExternal();
+        }
+    }
+
+    private void openRandomGrassExternal() {
         String url = GRASS_URLS[(int)(Math.random() * GRASS_URLS.length)];
         try { Desktop.getDesktop().browse(new java.net.URI(url)); }
         catch (Exception e) { e.printStackTrace(); }
+    }
+
+    private void updateBar(JProgressBar bar, JLabel label, String name, double value) {
+        bar.setValue((int) value);
+        double valueRounded = (double) Math.round(value * 100.0) / 100;
+        label.setText(name + ": " + valueRounded + "%");
+        bar.setForeground(Theme.progressColor((int) value));
+        bar.repaint();
+        label.repaint();
     }
 }

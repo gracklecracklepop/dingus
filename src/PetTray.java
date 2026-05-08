@@ -12,7 +12,13 @@ public class PetTray {
         bed = bedWindow;
         petWindow = window;
 
-        if (!SystemTray.isSupported()) { System.out.println("System tray not supported."); return; }
+        // Ensure notifier exists early (won’t duplicate because bind() swaps it later)
+        TrayNotifier.ensureInitialized();
+
+        if (!SystemTray.isSupported()) {
+            System.out.println("System tray not supported.");
+            return;
+        }
 
         SystemTray tray = SystemTray.getSystemTray();
         Dimension size  = tray.getTrayIconSize();
@@ -22,28 +28,39 @@ public class PetTray {
         addItem(popup, "Show Pet",  () -> show(window));
         addItem(popup, "Hide Pet",  () -> hide(window));
         popup.addSeparator();
-        addItem(popup, "Feed",  () -> notify("Dingus", "Yummy! Thanks for the food!"));
-        addItem(popup, "Play",  () -> notify("Dingus", "Let's play!"));
+        addItem(popup, "Feed",  () -> TrayNotifier.showNotification("Dingus", "Yummy! Thanks for the food!"));
+        addItem(popup, "Play",  () -> TrayNotifier.showNotification("Dingus", "Let's play!"));
         popup.addSeparator();
         addItem(popup, "Exit",  () -> { remove(); System.exit(0); });
 
         trayIcon = new TrayIcon(scaled, "Dingus", popup);
         trayIcon.setImageAutoSize(true);
+
         trayIcon.addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2) { if (visible) hide(window); else show(window); }
+                if (e.getClickCount() == 2) {
+                    if (visible) hide(window); else show(window);
+                }
             }
         });
 
-        try { tray.add(trayIcon); }
-        catch (AWTException e) { System.err.println("Tray error: " + e.getMessage()); }
+        try {
+            tray.add(trayIcon);
+
+            // CRITICAL: bind TrayNotifier to THIS icon so you don’t get duplicates
+            TrayNotifier.bind(trayIcon);
+
+        } catch (AWTException e) {
+            System.err.println("Tray error: " + e.getMessage());
+        }
     }
 
     public static void hide(Window window) {
         window.setVisible(false);
         if (bed != null) bed.setVisible(false);
         visible = false;
-        notify("Dingus", "I'm hiding in the tray! Double-click to bring me back.");
+
+        TrayNotifier.showNotification("Dingus", "I'm hiding in the tray! Double-click to bring me back.");
     }
 
     public static void show(Window window) {
@@ -56,15 +73,14 @@ public class PetTray {
         window.setLocation(BedDialog.getCatSnapPosition());
         window.setVisible(true);
         window.setAlwaysOnTop(true);
+        window.toFront();
+
         visible = true;
     }
 
     public static void remove() {
         if (trayIcon != null) SystemTray.getSystemTray().remove(trayIcon);
-    }
-
-    private static void notify(String title, String msg) {
-        if (trayIcon != null) trayIcon.displayMessage(title, msg, TrayIcon.MessageType.INFO);
+        trayIcon = null;
     }
 
     private static void addItem(PopupMenu menu, String label, Runnable action) {

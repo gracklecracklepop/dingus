@@ -2,19 +2,33 @@ import java.awt.*;
 
 public class TrayNotifier {
 
+    // Default icon path used by ensureInitialized() if you don't pass one.
+    // Change this once to wherever your tray icon actually is.
+    public static String DEFAULT_ICON_PATH = "icon.png";
+
     private static TrayIcon trayIcon;
     private static boolean initialized = false;
 
+    // If we created our own icon, we can remove it later when PetTray binds its icon.
+    private static TrayIcon ownedIcon = null;
+
+    /** Ensure tray is ready using DEFAULT_ICON_PATH. Safe to call many times. */
+    public static boolean ensureInitialized() {
+        return ensureInitialized(DEFAULT_ICON_PATH);
+    }
+
+    /** Ensure tray is ready. Safe to call many times. */
+    public static boolean ensureInitialized(String iconPath) {
+        if (initialized && trayIcon != null) return true;
+        return initialize(iconPath);
+    }
+
     /**
-     * Initialize the system tray icon
-     * @param iconPath Path to the icon image file
-     * @return true if initialization was successful, false otherwise
+     * Initialize the system tray icon (temporary icon).
+     * If PetTray later calls bind(...), this temporary icon will be removed.
      */
     public static boolean initialize(String iconPath) {
-        if (initialized) {
-            System.out.println("⚠️ TrayNotifier already initialized");
-            return true;
-        }
+        if (initialized && trayIcon != null) return true;
 
         if (!SystemTray.isSupported()) {
             System.err.println("❌ SystemTray is not supported on this platform.");
@@ -24,18 +38,18 @@ public class TrayNotifier {
         try {
             SystemTray tray = SystemTray.getSystemTray();
 
-            // Load the icon image
             Image image = Toolkit.getDefaultToolkit().createImage(iconPath);
+            TrayIcon icon = new TrayIcon(image, "Dingus");
+            icon.setImageAutoSize(true);
+            icon.setToolTip("Dingus");
 
-            trayIcon = new TrayIcon(image, "Dinglet");
-            trayIcon.setImageAutoSize(true);
-            trayIcon.setToolTip("Dinglet - Your Virtual Pet");
+            tray.add(icon);
 
-            tray.add(trayIcon);
+            trayIcon = icon;
+            ownedIcon = icon;   // mark as temporary-owned
             initialized = true;
-            System.out.println("✅ System tray icon initialized");
-            return true;
 
+            return true;
         } catch (AWTException e) {
             System.err.println("❌ TrayIcon could not be added to system tray");
             e.printStackTrace();
@@ -48,31 +62,36 @@ public class TrayNotifier {
     }
 
     /**
-     * Show a notification in the system tray
-     * @param title The notification title
-     * @param message The notification message
-     * @return true if notification was shown, false otherwise
+     * Bind TrayNotifier to an existing TrayIcon (your PetTray icon).
+     * This prevents duplicate tray icons and makes all notifications use the PetTray icon.
      */
+    public static void bind(TrayIcon existingTrayIcon) {
+        if (existingTrayIcon == null) return;
+
+        // If we previously created a temporary icon, remove it.
+        if (ownedIcon != null) {
+            try {
+                SystemTray.getSystemTray().remove(ownedIcon);
+            } catch (Exception ignored) {}
+            ownedIcon = null;
+        }
+
+        trayIcon = existingTrayIcon;
+        initialized = true;
+    }
+
     public static boolean showNotification(String title, String message) {
         return showNotification(title, message, TrayIcon.MessageType.INFO);
     }
 
-    /**
-     * Show a notification with a specific message type
-     * @param title The notification title
-     * @param message The notification message
-     * @param messageType The type of notification (INFO, WARNING, ERROR, NONE)
-     * @return true if notification was shown, false otherwise
-     */
     public static boolean showNotification(String title, String message, TrayIcon.MessageType messageType) {
         if (!initialized || trayIcon == null) {
-            System.err.println("❌ TrayIcon not initialized. Call initialize() first.");
-            return false;
+            // Try to auto-init with default icon
+            if (!ensureInitialized()) return false;
         }
 
         try {
             trayIcon.displayMessage(title, message, messageType);
-            System.out.println("📢 Notification shown: " + title);
             return true;
         } catch (Exception e) {
             System.err.println("❌ Failed to show notification: " + e.getMessage());
@@ -81,21 +100,17 @@ public class TrayNotifier {
         }
     }
 
-    /**
-     * Remove the tray icon
-     * @return true if icon was removed, false otherwise
-     */
     public static boolean remove() {
-        if (!initialized || trayIcon == null) {
-            System.out.println("⚠️ Tray icon not initialized, nothing to remove");
-            return false;
-        }
+        if (!initialized || trayIcon == null) return false;
 
         try {
-            SystemTray.getSystemTray().remove(trayIcon);
+            // Only remove if it's the temporary icon we owned.
+            if (ownedIcon != null) {
+                SystemTray.getSystemTray().remove(ownedIcon);
+                ownedIcon = null;
+            }
             initialized = false;
             trayIcon = null;
-            System.out.println("🗑️ Tray icon removed");
             return true;
         } catch (Exception e) {
             System.err.println("❌ Failed to remove tray icon: " + e.getMessage());
@@ -104,51 +119,11 @@ public class TrayNotifier {
         }
     }
 
-    /**
-     * Check if the tray notifier is initialized
-     * @return true if initialized, false otherwise
-     */
     public static boolean isInitialized() {
         return initialized;
     }
 
-    /**
-     * Check if system tray is supported on this platform
-     * @return true if supported, false otherwise
-     */
     public static boolean isSupported() {
         return SystemTray.isSupported();
-    }
-
-    /**
-     * Test method
-     */
-    public static void main(String[] args) {
-        try {
-            // Initialize with an icon
-            boolean initSuccess = initialize("icon.png");
-
-            if (!initSuccess) {
-                System.out.println("Failed to initialize, exiting...");
-                return;
-            }
-
-            // Show different types of notifications
-            boolean notifSuccess = showNotification("Dinglet has something to say!", "I want to go on a walk!");
-            System.out.println("Notification 1 success: " + notifSuccess);
-
-            // Wait a bit, then show another
-            Thread.sleep(3000);
-            notifSuccess = showNotification("Dinglet is happy!", "Thanks for playing with me! 🎾", TrayIcon.MessageType.INFO);
-            System.out.println("Notification 2 success: " + notifSuccess);
-
-            // Wait before removing
-            Thread.sleep(3000);
-            boolean removeSuccess = remove();
-            System.out.println("Remove success: " + removeSuccess);
-
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
     }
 }

@@ -1,12 +1,17 @@
 import com.sun.management.OperatingSystemMXBean;
+import javax.imageio.ImageIO;
 import javax.swing.*;
-import javax.swing.plaf.basic.BasicComboBoxUI;
 import javax.swing.plaf.basic.BasicComboBoxEditor;
+import javax.swing.plaf.basic.BasicComboBoxUI;
+import java.awt.image.BufferedImage;
+import javax.swing.text.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 
 public class SetupWizard extends JDialog {
 
@@ -26,6 +31,9 @@ public class SetupWizard extends JDialog {
     private JButton cpuNextBtn, cpuSkipBtn;
     private SwingWorker<Double, Object[]> cpuWorker;
 
+    // placement
+    private JLabel bedPosLabel;
+
     static {
         Theme.applyUIManagerDefaults();
     }
@@ -43,87 +51,54 @@ public class SetupWizard extends JDialog {
         JPanel mainContainer = new JPanel(new BorderLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(Theme.BG_MAIN);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), Theme.CORNER_RADIUS, Theme.CORNER_RADIUS);
+                Theme.paintMacWindow(g2, getWidth(), getHeight(), "✨ Initial Setup");
                 g2.dispose();
             }
         };
         mainContainer.setOpaque(false);
-        mainContainer.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
-
-        mainContainer.add(buildHeader(), BorderLayout.NORTH);
+        mainContainer.setBorder(BorderFactory.createEmptyBorder(
+                Theme.TITLEBAR_HEIGHT + 10, 15, 15, 15
+        ));
 
         cardPanel.setOpaque(false);
-        cardPanel.add(buildIntroCard(),        "intro");
-        cardPanel.add(buildRamCheckCard(),     "ram");
-        cardPanel.add(buildCpuCheckCard(),     "cpu");
-        cardPanel.add(buildCustomizationCard(),"custom");
-
-        // Guide card — shown after customization, before the game starts
-        GuidePanel guidePanel = new GuidePanel(() -> {
-            // "Back" in the guide goes back to customization in the wizard
-            cardLayout.show(cardPanel, "custom");
-        });
-        // Wrap guide in a panel with a "Start Game" button at the bottom
-        cardPanel.add(buildGuideWizardCard(guidePanel), "guide");
+        cardPanel.add(buildIntroCard(),         "intro");
+        cardPanel.add(buildRamCheckCard(),      "ram");
+        cardPanel.add(buildCpuCheckCard(),      "cpu");
+        cardPanel.add(buildCustomizationCard(), "custom");
+        cardPanel.add(buildBedPlacementCard(),  "bedplace");
 
         mainContainer.add(cardPanel, BorderLayout.CENTER);
         add(mainContainer);
+
         cardLayout.show(cardPanel, "intro");
+    }
+
+    @Override public void dispose() {
+        try { if (ramWorker != null) ramWorker.cancel(true); } catch (Exception ignored) {}
+        try { if (cpuWorker != null) cpuWorker.cancel(true); } catch (Exception ignored) {}
+        super.dispose();
     }
 
     public boolean isFinished() { return finished; }
     public PetStats getGeneratedStats() { return newStats; }
 
-    // ── Header ──────────────────────────────────────────────────
-
-    private JPanel buildHeader() {
-        JPanel header = new JPanel(new BorderLayout());
-        header.setOpaque(false);
-
-        JLabel title = new JLabel("✨ Initial Setup");
-        title.setForeground(Theme.TEXT_PRIMARY);
-        title.setFont(Theme.font(Theme.FONT_SIZE_HEADING));
-        header.add(title, BorderLayout.WEST);
-
-        JButton closeBtn = makeButton("X", () -> System.exit(0));
-        closeBtn.setBackground(Theme.BTN_CLOSE);
-        closeBtn.setPreferredSize(new Dimension(40, 30));
-        header.add(closeBtn, BorderLayout.EAST);
-
-        Point[] offset = {null};
-        header.addMouseListener(new MouseAdapter() {
-            @Override public void mousePressed(MouseEvent e) { offset[0] = e.getPoint(); }
-        });
-        header.addMouseMotionListener(new MouseMotionAdapter() {
-            @Override public void mouseDragged(MouseEvent e) {
-                if (offset[0] == null) return;
-                Point loc = getLocation();
-                setLocation(loc.x + e.getX() - offset[0].x, loc.y + e.getY() - offset[0].y);
-            }
-        });
-        return header;
-    }
-
-    // ── Step 1: Intro ───────────────────────────────────────────
+    // ── Intro ───────────────────────────────────────────────────
 
     private JPanel buildIntroCard() {
         JPanel p = new JPanel(new BorderLayout(10, 20));
         p.setOpaque(false);
-        p.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        p.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         JLabel title = new JLabel("Welcome!", SwingConstants.CENTER);
         title.setForeground(Theme.TEXT_PRIMARY);
         title.setFont(Theme.font(Theme.FONT_SIZE_TITLE));
 
         JTextArea instructions = new JTextArea(
-                "Before we create your pet, we need to measure your PC's baseline RAM and CPU usage " +
-                        "so your pet knows when you're working hard!\n\n" +
-                        "To get an accurate measurement:\n" +
-                        "1. Close all browsers, games, and heavy background apps.\n" +
-                        "2. Let your PC sit at the desktop for a moment.\n\n" +
-                        "When you're ready, click Start to begin the baseline scans."
+                "Before we create your pet, we measure baseline RAM/CPU.\n\n" +
+                        "For accuracy:\n" +
+                        "1. Close heavy apps\n" +
+                        "2. Let your PC idle briefly\n\n" +
+                        "Click Start to begin."
         );
         instructions.setWrapStyleWord(true);
         instructions.setLineWrap(true);
@@ -137,7 +112,8 @@ public class SetupWizard extends JDialog {
         buttonPanel.setOpaque(false);
 
         JButton startBtn = makeButton("Start Scan", () -> {
-            cardLayout.show(cardPanel, "ram"); runRamTest();
+            cardLayout.show(cardPanel, "ram");
+            runRamTest();
         });
         startBtn.setBackground(Theme.BTN_PRIMARY);
         startBtn.setPreferredSize(new Dimension(150, 40));
@@ -161,12 +137,12 @@ public class SetupWizard extends JDialog {
         cardLayout.show(cardPanel, "custom");
     }
 
-    // ── Step 2: RAM Scan ────────────────────────────────────────
+    // ── RAM Scan ────────────────────────────────────────────────
 
     private JPanel buildRamCheckCard() {
         JPanel p = new JPanel(new BorderLayout(10, 20));
         p.setOpaque(false);
-        p.setBorder(BorderFactory.createEmptyBorder(30, 20, 30, 20));
+        p.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         ramTitle = new JLabel("Measuring RAM Baseline...", SwingConstants.CENTER);
         ramTitle.setForeground(Theme.TEXT_PRIMARY);
@@ -191,19 +167,21 @@ public class SetupWizard extends JDialog {
         JPanel btns = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
         btns.setOpaque(false);
 
-        ramNextBtn = makeButton("Next: CPU Test ➡", () -> {
-            cardLayout.show(cardPanel, "cpu"); runCpuTest();
+        ramNextBtn = makeButton("Next: CPU ➡", () -> {
+            cardLayout.show(cardPanel, "cpu");
+            runCpuTest();
         });
         ramNextBtn.setEnabled(false);
-        ramNextBtn.setPreferredSize(new Dimension(160, 35));
+        ramNextBtn.setPreferredSize(new Dimension(140, 35));
 
         ramSkipBtn = makeButton("Skip ⏭", () -> {
             if (ramWorker != null) ramWorker.cancel(true);
             newStats.setBaseRam(0);
-            cardLayout.show(cardPanel, "cpu"); runCpuTest();
+            cardLayout.show(cardPanel, "cpu");
+            runCpuTest();
         });
         ramSkipBtn.setBackground(Theme.BTN_SECONDARY);
-        ramSkipBtn.setPreferredSize(new Dimension(80, 35));
+        ramSkipBtn.setPreferredSize(new Dimension(90, 35));
 
         btns.add(ramNextBtn);
         btns.add(ramSkipBtn);
@@ -215,7 +193,7 @@ public class SetupWizard extends JDialog {
     }
 
     private void runRamTest() {
-        ramWorker = new SwingWorker<Long, Object[]>() {
+        ramWorker = new SwingWorker<>() {
             @Override protected Long doInBackground() throws Exception {
                 OperatingSystemMXBean os = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
                 long end = System.currentTimeMillis() + (Theme.SCAN_DURATION_SECONDS * 1000L);
@@ -226,30 +204,40 @@ public class SetupWizard extends JDialog {
                     if (isCancelled()) return 0L;
                     long total = os.getTotalMemorySize(), free = os.getFreeMemorySize(), used = total - free;
                     double pct = (double) used / total * 100;
+
                     if (System.currentTimeMillis() >= next) { samples.add(used); next += 1000L; }
+
                     long elapsed = (Theme.SCAN_DURATION_SECONDS * 1000L) - Math.max(0, end - System.currentTimeMillis());
-                    publish(new Object[]{(int)((elapsed * 100) / (Theme.SCAN_DURATION_SECONDS * 1000L)), pct, used, total});
+                    publish(new Object[]{
+                            (int)((elapsed * 100) / (Theme.SCAN_DURATION_SECONDS * 1000L)), pct, used, total
+                    });
                     Thread.sleep(100);
                 }
+
                 long sum = 0; for (long s : samples) sum += s;
                 return samples.isEmpty() ? 0 : (sum / samples.size());
             }
+
             @Override protected void process(List<Object[]> chunks) {
-                if (isCancelled()) return;
+                if (isCancelled() || !isDisplayable()) return;
                 Object[] l = chunks.get(chunks.size() - 1);
                 ramProgressBar.setValue((Integer) l[0]);
                 ramLiveStats.setText(String.format("Used: %.2f GB / %.2f GB (%.1f%%)",
                         (Long)l[2]/1e9, (Long)l[3]/1e9, (Double)l[1]));
             }
+
             @Override protected void done() {
-                if (isCancelled()) return;
+                if (!isDisplayable() || isCancelled()) return;
                 try {
-                    long avg = get(); newStats.setBaseRam(avg / (1024 * 1024));
+                    long avg = get();
+                    newStats.setBaseRam(avg / (1024 * 1024));
                     ramProgressBar.setValue(100);
                     ramTitle.setText("RAM Baseline Complete!");
                     ramTitle.setForeground(Theme.ACCENT_SUCCESS);
                     ramLiveStats.setText(String.format("Average Baseline RAM: %.2f GB", avg / 1e9));
-                    ramNextBtn.setEnabled(true); ramSkipBtn.setVisible(false);
+                    ramNextBtn.setEnabled(true);
+                    ramSkipBtn.setVisible(false);
+                } catch (CancellationException ignored) {
                 } catch (Exception e) {
                     ramLiveStats.setText("Error measuring RAM.");
                     ramLiveStats.setForeground(Theme.ACCENT_ERROR);
@@ -260,12 +248,12 @@ public class SetupWizard extends JDialog {
         ramWorker.execute();
     }
 
-    // ── Step 3: CPU Scan ────────────────────────────────────────
+    // ── CPU Scan ────────────────────────────────────────────────
 
     private JPanel buildCpuCheckCard() {
         JPanel p = new JPanel(new BorderLayout(10, 20));
         p.setOpaque(false);
-        p.setBorder(BorderFactory.createEmptyBorder(30, 20, 30, 20));
+        p.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         cpuTitle = new JLabel("Measuring CPU Baseline...", SwingConstants.CENTER);
         cpuTitle.setForeground(Theme.TEXT_PRIMARY);
@@ -292,7 +280,7 @@ public class SetupWizard extends JDialog {
 
         cpuNextBtn = makeButton("Next: Customize ➡", () -> cardLayout.show(cardPanel, "custom"));
         cpuNextBtn.setEnabled(false);
-        cpuNextBtn.setPreferredSize(new Dimension(160, 35));
+        cpuNextBtn.setPreferredSize(new Dimension(170, 35));
 
         cpuSkipBtn = makeButton("Skip ⏭", () -> {
             if (cpuWorker != null) cpuWorker.cancel(true);
@@ -300,7 +288,7 @@ public class SetupWizard extends JDialog {
             cardLayout.show(cardPanel, "custom");
         });
         cpuSkipBtn.setBackground(Theme.BTN_SECONDARY);
-        cpuSkipBtn.setPreferredSize(new Dimension(80, 35));
+        cpuSkipBtn.setPreferredSize(new Dimension(90, 35));
 
         btns.add(cpuNextBtn);
         btns.add(cpuSkipBtn);
@@ -312,14 +300,7 @@ public class SetupWizard extends JDialog {
     }
 
     private void runCpuTest() {
-        cpuProgressBar.setValue(0);
-        cpuLiveStats.setText("Initializing scanner...");
-        cpuLiveStats.setForeground(Theme.ACCENT_CPU);
-        cpuTitle.setForeground(Theme.TEXT_PRIMARY);
-        cpuNextBtn.setEnabled(false);
-        cpuSkipBtn.setVisible(true);
-
-        cpuWorker = new SwingWorker<Double, Object[]>() {
+        cpuWorker = new SwingWorker<>() {
             @Override protected Double doInBackground() throws Exception {
                 OperatingSystemMXBean os = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
                 long end = System.currentTimeMillis() + (Theme.SCAN_DURATION_SECONDS * 1000L);
@@ -329,31 +310,43 @@ public class SetupWizard extends JDialog {
 
                 while (System.currentTimeMillis() < end) {
                     if (isCancelled()) return 0.0;
-                    double load = os.getCpuLoad(), pct = load * 100;
+                    double load = os.getCpuLoad();
+                    double pct = load * 100;
+
                     if (System.currentTimeMillis() >= next && load >= 0) { samples.add(pct); next += 1000L; }
+
                     long elapsed = (Theme.SCAN_DURATION_SECONDS * 1000L) - Math.max(0, end - System.currentTimeMillis());
-                    publish(new Object[]{(int)((elapsed * 100) / (Theme.SCAN_DURATION_SECONDS * 1000L)), pct, os.getAvailableProcessors()});
+                    publish(new Object[]{
+                            (int)((elapsed * 100) / (Theme.SCAN_DURATION_SECONDS * 1000L)), pct, os.getAvailableProcessors()
+                    });
                     Thread.sleep(100);
                 }
+
                 double sum = 0; for (double s : samples) sum += s;
                 return samples.isEmpty() ? 0 : (sum / samples.size());
             }
+
             @Override protected void process(List<Object[]> chunks) {
-                if (isCancelled()) return;
+                if (isCancelled() || !isDisplayable()) return;
                 Object[] l = chunks.get(chunks.size() - 1);
                 cpuProgressBar.setValue((Integer) l[0]);
                 cpuLiveStats.setText(String.format("%s %.1f%% (%d cores)",
                         generateBar((Double)l[1]), (Double)l[1], (Integer)l[2]));
             }
+
             @Override protected void done() {
-                if (isCancelled()) return;
+                if (!isDisplayable() || isCancelled()) return;
                 try {
-                    double avg = get(); newStats.setBaseCpu(avg);
+                    double avg = get();
+                    newStats.setBaseCpu(avg);
+
                     cpuProgressBar.setValue(100);
                     cpuTitle.setText("CPU Baseline Complete!");
                     cpuTitle.setForeground(Theme.ACCENT_SUCCESS);
                     cpuLiveStats.setText(String.format("Average Baseline CPU: %.1f%%", avg));
-                    cpuNextBtn.setEnabled(true); cpuSkipBtn.setVisible(false);
+                    cpuNextBtn.setEnabled(true);
+                    cpuSkipBtn.setVisible(false);
+                } catch (CancellationException ignored) {
                 } catch (Exception e) {
                     cpuLiveStats.setText("Error measuring CPU.");
                     cpuLiveStats.setForeground(Theme.ACCENT_ERROR);
@@ -369,14 +362,15 @@ public class SetupWizard extends JDialog {
         return "[" + "█".repeat(f) + "░".repeat(10 - f) + "]";
     }
 
-    // ── Step 4: Customization ───────────────────────────────────
+    // ── Customization ───────────────────────────────────────────
 
     private JPanel buildCustomizationCard() {
         JPanel p = new JPanel(new GridLayout(6, 2, 10, 15));
         p.setOpaque(false);
-        p.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        p.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         JTextField nameField = createStyledTextField("");
+        ((AbstractDocument) nameField.getDocument()).setDocumentFilter(new LimitFilter(10));
 
         JComboBox<String> genderBox = createStyledComboBox(new String[]{
                 "Male (he/him)", "Female (she/her)", "Non-binary (they/them)"
@@ -385,37 +379,117 @@ public class SetupWizard extends JDialog {
                 "Default (Orange)", "Void (Black)", "Ghost (White)"
         });
 
-        p.add(styledLabel("Pet Name:"));     p.add(nameField);
-        p.add(styledLabel("Gender:"));       p.add(genderBox);
-        p.add(styledLabel("Sprite Color:")); p.add(colorBox);
-        p.add(new JLabel());                 p.add(new JLabel());
+        p.add(styledLabel("Pet Name (max 10):")); p.add(nameField);
+        p.add(styledLabel("Gender:"));           p.add(genderBox);
+        p.add(styledLabel("Sprite Color:"));     p.add(colorBox);
+        p.add(new JLabel());                     p.add(new JLabel());
 
-        JButton guideBtn = makeButton("📖 How to Play", () ->
-                cardLayout.show(cardPanel, "guide"));
-        guideBtn.setBackground(Theme.BTN_SECONDARY);
-
-        JButton finishBtn = makeButton("Start Game!", () -> {
+        JButton nextBtn = makeButton("Next: Place Bed ➡", () -> {
             newStats.setName(nameField.getText());
             newStats.setGender((String) genderBox.getSelectedItem());
             newStats.setSpriteColor((String) colorBox.getSelectedItem());
             newStats.setHunger(100); newStats.setHappiness(100);
             newStats.setEnergy(100); newStats.setCoins(0);
-            finished = true; dispose();
-        });
-        finishBtn.setBackground(Theme.BTN_PRIMARY);
 
-        p.add(guideBtn);
-        p.add(finishBtn);
+            cardLayout.show(cardPanel, "bedplace");
+        });
+        nextBtn.setBackground(Theme.BTN_PRIMARY);
+
+        JButton skipPlacement = makeButton("Skip Placement", () -> {
+            finished = true;
+            dispose();
+        });
+        skipPlacement.setBackground(Theme.BTN_SECONDARY);
+
+        p.add(skipPlacement);
+        p.add(nextBtn);
         return p;
     }
 
-    // ── Step 5: Guide (wraps GuidePanel with a finish button) ───
+    // ── Bed Placement step (ONLY bed placement) ─────────────────
 
-    private JPanel buildGuideWizardCard(GuidePanel guidePanel) {
-        JPanel wrapper = new JPanel(new BorderLayout());
-        wrapper.setOpaque(false);
-        wrapper.add(guidePanel, BorderLayout.CENTER);
-        return wrapper;
+    private JPanel buildBedPlacementCard() {
+        JPanel p = new JPanel(new BorderLayout(0, 12));
+        p.setOpaque(false);
+        p.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JLabel title = new JLabel("Place your bed", SwingConstants.CENTER);
+        title.setForeground(Theme.TEXT_PRIMARY);
+        title.setFont(Theme.font(Theme.FONT_SIZE_HEADING));
+        p.add(title, BorderLayout.NORTH);
+
+        JPanel center = new JPanel();
+        center.setOpaque(false);
+        center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
+
+        JLabel info = new JLabel("Click to preview + confirm bed placement (desktop stays visible).");
+        info.setForeground(Theme.TEXT_SECONDARY);
+        info.setFont(Theme.font(Theme.FONT_SIZE_BODY));
+        info.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        bedPosLabel = new JLabel("Bed: not set");
+        bedPosLabel.setForeground(Theme.TEXT_PRIMARY);
+        bedPosLabel.setFont(Theme.font(Theme.FONT_SIZE_BODY));
+        bedPosLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JButton placeBedBtn = makeButton("Choose Bed Location", () -> {
+            BufferedImage bedPreview = loadBedForColor(newStats.getSpriteColor());
+            Point topLeft = BedPlacementOverlay.pickBedTopLeft(this, bedPreview, BedDialog.BED_WIDTH, BedDialog.BED_HEIGHT);
+            if (topLeft != null) {
+                newStats.setBedPos(topLeft.x, topLeft.y);
+                bedPosLabel.setText("Bed: (" + topLeft.x + ", " + topLeft.y + ")");
+            }
+        });
+        placeBedBtn.setBackground(Theme.BTN_SECONDARY);
+        placeBedBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        center.add(info);
+        center.add(Box.createVerticalStrut(10));
+        center.add(placeBedBtn);
+        center.add(Box.createVerticalStrut(10));
+        center.add(bedPosLabel);
+
+        p.add(center, BorderLayout.CENTER);
+
+        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
+        bottom.setOpaque(false);
+
+        JButton back = makeButton("⬅ Back", () -> cardLayout.show(cardPanel, "custom"));
+        back.setBackground(Theme.BTN_DEFAULT);
+
+        JButton finishBtn = makeButton("Start Game!", () -> {
+            // done – bed pos may or may not be set; if not set you can fallback in BedDialog.
+            finished = true;
+            dispose();
+        });
+        finishBtn.setBackground(Theme.BTN_PRIMARY);
+
+        bottom.add(back);
+        bottom.add(finishBtn);
+        p.add(bottom, BorderLayout.SOUTH);
+
+        return p;
+    }
+
+    private BufferedImage loadBedForColor(String spriteColor) {
+        try {
+            String path;
+
+            if (spriteColor == null) {
+                path = "dingus - Copy/orangebed.png";
+            } else {
+                path = switch (spriteColor) {
+                    case "Void (Black)"  -> "dingus - Copy/blackbed.png";
+                    case "Ghost (White)" -> "dingus - Copy/whitebed.png";
+                    case "Default (Orange)" -> "dingus - Copy/orangebed.png";
+                    default -> "dingus - Copy/orangebed.png";
+                };
+            }
+
+            return ImageIO.read(new File(path));
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ── Styling Helpers ─────────────────────────────────────────
@@ -428,13 +502,7 @@ public class SetupWizard extends JDialog {
     }
 
     private JTextField createStyledTextField(String defaultText) {
-        JTextField field = new JTextField(defaultText) {
-            @Override protected void paintComponent(Graphics g) {
-                g.setColor(Theme.BG_INPUT);
-                g.fillRect(0, 0, getWidth(), getHeight());
-                super.paintComponent(g);
-            }
-        };
+        JTextField field = new JTextField(defaultText);
         field.setOpaque(true);
         field.setBackground(Theme.BG_INPUT);
         field.setForeground(Theme.TEXT_PRIMARY);
@@ -443,7 +511,7 @@ public class SetupWizard extends JDialog {
         field.setSelectionColor(Theme.BG_DROPDOWN_SELECTED);
         field.setSelectedTextColor(Theme.TEXT_PRIMARY);
         field.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(Theme.BG_INPUT_BORDER, 1),
+                BorderFactory.createLineBorder(Theme.BG_INPUT_BORDER, 2),
                 BorderFactory.createEmptyBorder(5, 8, 5, 8)
         ));
         return field;
@@ -455,46 +523,27 @@ public class SetupWizard extends JDialog {
         cb.setBackground(Theme.BG_INPUT);
         cb.setForeground(Theme.TEXT_PRIMARY);
         cb.setFont(Theme.font(Theme.FONT_SIZE_BODY));
-        cb.setBorder(BorderFactory.createLineBorder(Theme.BG_INPUT_BORDER, 1));
+        cb.setBorder(BorderFactory.createLineBorder(Theme.BG_INPUT_BORDER, 2));
 
         cb.setUI(new BasicComboBoxUI() {
             @Override protected JButton createArrowButton() {
-                JButton btn = new JButton("▼") {
-                    @Override protected void paintComponent(Graphics g) {
-                        g.setColor(Theme.BG_INPUT_BORDER);
-                        g.fillRect(0, 0, getWidth(), getHeight());
-                        g.setColor(Theme.TEXT_PRIMARY);
-                        FontMetrics fm = g.getFontMetrics();
-                        g.drawString("▼", (getWidth() - fm.stringWidth("▼")) / 2,
-                                (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
-                    }
-                };
+                JButton btn = new JButton("▾");
                 btn.setBorder(BorderFactory.createEmptyBorder());
                 btn.setFocusPainted(false);
                 btn.setContentAreaFilled(false);
                 return btn;
             }
-            @Override protected void installDefaults() {
-                super.installDefaults();
-                LookAndFeel.installProperty(comboBox, "opaque", true);
-            }
         });
 
         cb.setEditor(new BasicComboBoxEditor() {
             @Override protected JTextField createEditorComponent() {
-                JTextField editor = new JTextField() {
-                    @Override protected void paintComponent(Graphics g) {
-                        g.setColor(Theme.BG_INPUT);
-                        g.fillRect(0, 0, getWidth(), getHeight());
-                        super.paintComponent(g);
-                    }
-                };
+                JTextField editor = new JTextField();
                 editor.setOpaque(true);
                 editor.setBackground(Theme.BG_INPUT);
                 editor.setForeground(Theme.TEXT_PRIMARY);
                 editor.setCaretColor(Theme.TEXT_PRIMARY);
                 editor.setFont(Theme.font(Theme.FONT_SIZE_BODY));
-                editor.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
+                editor.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
                 return editor;
             }
         });
@@ -502,8 +551,7 @@ public class SetupWizard extends JDialog {
         cb.setRenderer(new DefaultListCellRenderer() {
             @Override public Component getListCellRendererComponent(JList<?> list, Object value,
                                                                     int index, boolean isSelected, boolean cellHasFocus) {
-                JLabel label = (JLabel) super.getListCellRendererComponent(
-                        list, value, index, isSelected, cellHasFocus);
+                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
                 label.setFont(Theme.font(Theme.FONT_SIZE_BODY));
                 label.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
                 label.setOpaque(true);
@@ -522,29 +570,57 @@ public class SetupWizard extends JDialog {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
                 Color bg = getBackground();
                 if (!isEnabled())                 bg = Theme.BTN_DISABLED;
-                else if (getModel().isPressed())  bg = bg.darker();
-                else if (getModel().isRollover()) bg = bg.brighter();
+                else if (getModel().isPressed())  bg = Theme.BTN_PRESSED;
+                else if (getModel().isRollover()) bg = Theme.BTN_HOVER;
+
                 g2.setColor(bg);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(),
-                        Theme.BUTTON_CORNER_RADIUS, Theme.BUTTON_CORNER_RADIUS + 1);
+                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1,
+                        Theme.BUTTON_CORNER_RADIUS, Theme.BUTTON_CORNER_RADIUS);
+
+                g2.setColor(Theme.BG_INPUT_BORDER);
+                g2.setStroke(new BasicStroke(2));
+                g2.drawRoundRect(0, 0, getWidth() - 2, getHeight() - 2,
+                        Theme.BUTTON_CORNER_RADIUS, Theme.BUTTON_CORNER_RADIUS);
+
                 g2.setColor(isEnabled() ? Theme.TEXT_PRIMARY : Theme.TEXT_DISABLED);
                 g2.setFont(Theme.font(Theme.FONT_SIZE_BUTTON));
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(getText(),
                         (getWidth() - fm.stringWidth(getText())) / 2,
                         (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
+
                 g2.dispose();
             }
         };
         btn.setBackground(Theme.BTN_DEFAULT);
-        btn.setForeground(Theme.TEXT_PRIMARY);
         btn.setBorderPainted(false);
         btn.setContentAreaFilled(false);
         btn.setFocusPainted(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         if (action != null) btn.addActionListener(e -> action.run());
         return btn;
+    }
+
+    private static class LimitFilter extends DocumentFilter {
+        private final int max;
+        LimitFilter(int max) { this.max = max; }
+
+        @Override public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr)
+                throws BadLocationException {
+            if (string == null) return;
+            if (fb.getDocument().getLength() + string.length() <= max) super.insertString(fb, offset, string, attr);
+        }
+
+        @Override public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs)
+                throws BadLocationException {
+            if (text == null) return;
+            int cur = fb.getDocument().getLength();
+            int next = cur - length + text.length();
+            if (next <= max) super.replace(fb, offset, length, text, attrs);
+        }
     }
 }

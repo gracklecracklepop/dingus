@@ -10,11 +10,13 @@ public class PetPanel extends JPanel {
 
     private static final int BUTTON_SIZE = 30;
     private static final int SNAP_MARGIN = 60;
-    PetStats petstat = SaveManager.load();
+
+    private final PetStats stats;
 
     private BufferedImage normalImage;
     private BufferedImage dragImage;
-    private BufferedImage bedImage;
+    private BufferedImage bedImage;   // cat-in-bed sprite
+    private BufferedImage bedAlone;   // bed-only sprite
     private BufferedImage currentImage;
 
     private final JButton menuToggleButton;
@@ -25,24 +27,22 @@ public class PetPanel extends JPanel {
     private BedDialog bed;
 
     private boolean isDragging = false;
+    private boolean isInBed = false;     // track bed state (don’t rely on image reference equality)
     private int preDragHeight = -1;
 
     private static final Cursor CURSOR_DEFAULT = Cursor.getDefaultCursor();
-    private static final Cursor CURSOR_GRAB    = Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR);
-
-    static Toolkit toolkit = Toolkit.getDefaultToolkit();
-    static Dimension screenSize = toolkit.getScreenSize();
-    double dpiScale = Theme.getDpiScale();
 
     public PetPanel(JDialog dialog) {
         this.dialog = dialog;
         setLayout(null);
 
-        setimages(petstat.getSpriteColor());
+        // Load ONCE and share
+        this.stats = SaveManager.load();
+
+        setimages(stats.getSpriteColor());
         currentImage = normalImage;
 
-        PetStats stats = SaveManager.load();
-        menu = new PetMenu(stats, dialog);
+        menu = new PetMenu(stats, dialog, () -> applyAppearanceFromStats(stats));
 
         menuToggleButton = buildToggleButton();
         menuToggleButton.setBounds(5, 85, BUTTON_SIZE, BUTTON_SIZE);
@@ -53,30 +53,67 @@ public class PetPanel extends JPanel {
 
     public void setBedDialog(BedDialog bed) {
         this.bed = bed;
-        bed.setVisible(false);
-        currentImage = bedImage;
+
+        // show correct bed immediately (bedAlone depends on current color)
+        bed.setBedSprite(bedAlone);
+
+        // IMPORTANT: don’t force the cat into bed at startup
+        // (your previous version did: currentImage = bedImage; bed.setVisible(false);)
+        bed.positionAtBottom();
+        bed.setVisible(!isInBed);
+
+        repaint();
+    }
+
+    public void applyAppearanceFromStats(PetStats s) {
+        setimages(s.getSpriteColor());
+
+        // update bed-only sprite immediately
+        if (bed != null) bed.setBedSprite(bedAlone);
+
+        // preserve current state (dragging / in bed / normal)
+        if (isDragging) currentImage = (dragImage != null) ? dragImage : normalImage;
+        else if (isInBed) currentImage = bedImage;
+        else currentImage = normalImage;
+
         repaint();
     }
 
     public void setimages(String color) {
-        System.out.println(color);
         switch (color) {
-            case "Void (Black)":
+            case "Void (Black)" -> {
                 normalImage = loadImage("dingus - Copy/blacksitting.png");
                 dragImage   = loadImage("dingus - Copy/blackscruff.png");
                 bedImage    = loadImage("dingus - Copy/blackinbed.png");
-                break;
-            case "Default (Orange)":
-                normalImage = loadImage("dingus - Copy/orangesitting.png");
-                dragImage   = loadImage("dingus - Copy/orangescruff.png");
-                bedImage    = loadImage("dingus - Copy/orangeinbed.png");
-                break;
-            case "Ghost (White)":
+                bedAlone    = loadImage("dingus - Copy/blackbed.png");
+            }
+            case "Ghost (White)" -> {
                 normalImage = loadImage("dingus - Copy/whitesitting.png");
                 dragImage   = loadImage("dingus - Copy/whitescruff.png");
                 bedImage    = loadImage("dingus - Copy/whiteinbed.png");
-                break;
+                bedAlone    = loadImage("dingus - Copy/whitebed.png");
+            }
+            case "Default (Orange)" -> {
+                normalImage = loadImage("dingus - Copy/orangesitting.png");
+                dragImage   = loadImage("dingus - Copy/orangescruff.png");
+                bedImage    = loadImage("dingus - Copy/orangeinbed.png");
+                bedAlone    = loadImage("dingus - Copy/orangebed.png");
+            }
+            default -> {
+                normalImage = loadImage("dingus - Copy/orangesitting.png");
+                dragImage   = loadImage("dingus - Copy/orangescruff.png");
+                bedImage    = loadImage("dingus - Copy/orangeinbed.png");
+                bedAlone    = loadImage("dingus - Copy/orangebed.png");
+            }
         }
+
+        // Safety fallbacks if any sprite missing
+        if (normalImage == null && dragImage != null) normalImage = dragImage;
+        if (dragImage == null) dragImage = normalImage;
+        if (bedImage == null) bedImage = normalImage;
+
+        // bedAlone fallback (so bed never disappears if a file is missing)
+        if (bedAlone == null) bedAlone = loadImage("dingus - Copy/orangebed.png");
     }
 
     public void setDragging(boolean dragging) {
@@ -84,19 +121,18 @@ public class PetPanel extends JPanel {
 
         if (dragging) {
             preDragHeight = dialog.getHeight();
-            System.out.println("BEFORE resize: " + dialog.getWidth() + "x" + dialog.getHeight());
+
+            // picking up the cat: it is no longer “in bed”
+            isInBed = false;
+            if (bed != null) bed.setVisible(true);
+
+            // Switch to drag sprite
+            currentImage = (dragImage != null) ? dragImage : normalImage;
+
             dialog.setResizable(true);
             dialog.setSize(dialog.getWidth(), preDragHeight + 100);
             dialog.setLocation(dialog.getX(), dialog.getY() - 100);
             dialog.setResizable(false);
-            menuToggleButton.setVisible(false);
-            System.out.println("AFTER resize: " + dialog.getWidth() + "x" + dialog.getHeight());
-            currentImage = dragImage;
-            bed.setVisible(true);
-            bed.setAlwaysOnTop(false);
-            dialog.setAlwaysOnTop(true);
-
-            // ... rest unchanged
 
         } else {
             setCursor(CURSOR_DEFAULT);
@@ -109,24 +145,34 @@ public class PetPanel extends JPanel {
                 preDragHeight = -1;
             }
 
+            // NEW: check if we dropped onto a grass window (in-app GrassDialog)
+            // (Only works if your Play opens GrassDialog, not external browser tabs.)
+            try {
+                menu.checkGrassDrop(dialog.getBounds());
+            } catch (Throwable ignored) {}
+
+            // Then do bed snapping logic
             if (isNearBed()) {
                 snapToBed();
-                currentImage = bedImage;
+                isInBed = true;
+                currentImage = bedImage;   // cat-in-bed sprite
                 if (bed != null) bed.setVisible(false);
             } else {
+                isInBed = false;
                 currentImage = normalImage;
                 if (bed != null) bed.setVisible(true);
             }
 
             menuToggleButton.setVisible(true);
         }
+
         repaint();
     }
 
     public boolean isOverMenuButton(Point p) {
         if (!menuToggleButton.isVisible()) return false;
         return p.x >= 5 && p.x <= 5 + BUTTON_SIZE
-                && p.y >= 5 && p.y <= 5 + BUTTON_SIZE;
+                && p.y >= 85 && p.y <= 85 + BUTTON_SIZE;
     }
 
     // ── Bed Detection & Snapping ─────────────────────────────────
@@ -147,7 +193,7 @@ public class PetPanel extends JPanel {
         dialog.setLocation(BedDialog.getCatSnapPosition());
     }
 
-    // ── Private helpers ──────────────────────────────────────────
+    // ── Menu toggle (power / X) ──────────────────────────────────
 
     private void toggleMenu() {
         menuVisible = !menuVisible;
@@ -164,10 +210,11 @@ public class PetPanel extends JPanel {
             menuToggleButton.setToolTipText("Open menu");
         }
 
-        menuToggleButton.repaint();   // <-- redraw icon (power vs X)
+        menuToggleButton.repaint();
         dialog.revalidate();
         dialog.repaint();
     }
+
     private JButton buildToggleButton() {
         JButton btn = new JButton() {
             @Override protected void paintComponent(Graphics g) {
@@ -175,23 +222,19 @@ public class PetPanel extends JPanel {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-                // background color by state
                 Color bg = Theme.BTN_DEFAULT;
                 if (!isEnabled()) bg = Theme.BTN_DISABLED;
                 else if (getModel().isPressed()) bg = Theme.BTN_PRESSED;
                 else if (getModel().isRollover()) bg = Theme.BTN_HOVER;
 
-                // button body
                 int r = 10;
                 g2.setColor(bg);
                 g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, r, r);
 
-                // ink outline
                 g2.setColor(Theme.BG_INPUT_BORDER);
                 g2.setStroke(new BasicStroke(2f));
                 g2.drawRoundRect(0, 0, getWidth() - 2, getHeight() - 2, r, r);
 
-                // icon (power when closed, X when open)
                 g2.setColor(Theme.TEXT_PRIMARY);
                 g2.setStroke(new BasicStroke(2.4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 
@@ -200,17 +243,11 @@ public class PetPanel extends JPanel {
                 int cy = getHeight() / 2;
 
                 if (!menuVisible) {
-                    // macOS-ish power icon: broken circle + stem
                     int rr = (Math.min(getWidth(), getHeight()) - pad * 2) / 2;
                     int d  = rr * 2;
-
-                    // arc with a gap at the top
                     g2.drawArc(cx - rr, cy - rr + 1, d, d, 35, 290);
-
-                    // stem
                     g2.drawLine(cx, cy - rr - 1, cx, cy - 2);
                 } else {
-                    // close X icon
                     int x1 = pad, y1 = pad;
                     int x2 = getWidth() - pad;
                     int y2 = getHeight() - pad;
@@ -229,49 +266,58 @@ public class PetPanel extends JPanel {
         btn.setRolloverEnabled(true);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btn.setToolTipText("Open menu");
-
         btn.addActionListener(e -> toggleMenu());
-
-        // keep your drag logic safe (consume press)
         btn.addMouseListener(new MouseAdapter() {
             @Override public void mousePressed(MouseEvent e) { e.consume(); }
         });
-
         return btn;
     }
-    public void applyAppearanceFromStats(PetStats stats) {
-        setimages(stats.getSpriteColor());
-
-        // keep the current “state” image consistent
-        if (currentImage == bedImage) {
-            currentImage = bedImage;
-        } else {
-            currentImage = normalImage;
-        }
-        repaint();
-    }
-
 
     private static BufferedImage loadImage(String path) {
         try { return ImageIO.read(new File(path)); }
-        catch (IOException e) { e.printStackTrace(); return null; }
+        catch (IOException e) { System.err.println("Missing image: " + path); return null; }
+    }
+
+    // ── Drawing helpers (no stretching) ──────────────────────────
+
+    private static void drawImageAspect(Graphics2D g2, BufferedImage img, Rectangle box) {
+        if (img == null) return;
+
+        int iw = img.getWidth();
+        int ih = img.getHeight();
+
+        double sx = box.width  / (double) iw;
+        double sy = box.height / (double) ih;
+        double s = Math.min(sx, sy);
+
+        int dw = (int) Math.round(iw * s);
+        int dh = (int) Math.round(ih * s);
+
+        int dx = box.x + (box.width  - dw) / 2;
+        int dy = box.y + (box.height - dh) / 2;
+
+        g2.drawImage(img, dx, dy, dw, dh, null);
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,  RenderingHints.VALUE_ANTIALIAS_ON);
 
-        if (currentImage != null) {
-            if (isDragging) {
-                // use full panel height so the image stretches into the extra 100px
-                g2.drawImage(currentImage, 0, +100, BedDialog.imgW - 125, getHeight() -100, this);
-            } else {
-                g2.drawImage(currentImage, 0, 80, BedDialog.imgW, BedDialog.imgH, this);
-            }
-        }
+        Graphics2D g2 = (Graphics2D) g.create();
+
+        // Pixel-crisp scaling
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        int baseY = 80;
+        int dragYOffset = 100;
+
+        Rectangle spriteBox = isDragging
+                ? new Rectangle(0, baseY + dragYOffset, getWidth(), BedDialog.imgH)
+                : new Rectangle(0, baseY, getWidth(), BedDialog.imgH);
+
+        drawImageAspect(g2, currentImage, spriteBox);
 
         g2.dispose();
     }

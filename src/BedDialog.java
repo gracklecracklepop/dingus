@@ -9,12 +9,16 @@ public class BedDialog extends JDialog {
 
     static Toolkit toolkit = Toolkit.getDefaultToolkit();
     static Dimension screenSize = toolkit.getScreenSize();
-    public static int imgW = (int)(screenSize.getWidth()  / 5);
-    public static int imgH = (int)(screenSize.getHeight() / 5);
+
+    public static int imgW = (int) (screenSize.getWidth()  / 5);
+    public static int imgH = (int) (screenSize.getHeight() / 5);
+
     static final int BED_WIDTH  = imgW;
     static final int BED_HEIGHT = imgH;
 
-    public BedDialog() {  // <-- Window instead of JFrame
+    private final BedPanel panel;
+
+    public BedDialog() {
         setUndecorated(true);
         setBackground(new Color(0, 0, 0, 0));
         setFocusable(false);
@@ -22,8 +26,13 @@ public class BedDialog extends JDialog {
 
         AWTUtilities_setWindowOpaque(this);
 
-        add(new BedPanel());
+        panel = new BedPanel();
+        add(panel);
         pack();
+    }
+
+    public void setBedSprite(BufferedImage img) {
+        panel.setImage(img);
     }
 
     public void positionAtBottom() {
@@ -31,100 +40,62 @@ public class BedDialog extends JDialog {
     }
 
     public static Point getBedScreenPosition() {
-        Rectangle usable = Theme.getUsableScreen();
-
-        int xOffset = 0;
-        int yOffset = 0;
-
-        switch (Theme.getScalePercent()) {
-            case 100 -> {
-                xOffset = -30;
-                yOffset = +15;
-            }
-            case 125 -> {
-                xOffset = -38;
-                yOffset = 9;
-            }
-            case 150 -> {
-                xOffset = -38;
-                yOffset = 10;
-            }
-            case 175 -> {
-                xOffset = -122;
-                yOffset = -22;
-            }
-            default -> {
-                xOffset = -70;
-                yOffset = -10;
-            }
+        PetStats s = SaveManager.load();
+        if (s != null && s.hasBedPos()) {
+            return new Point(s.getBedX(), s.getBedY());
         }
 
-        int x = usable.x + usable.width - BED_WIDTH + xOffset;
-        int y = usable.y + usable.height - BED_HEIGHT + yOffset;
-
+        // fallback: old bottom-right placement
+        Rectangle usable = Theme.getUsableScreen();
+        int x = usable.x + usable.width  - BED_WIDTH;
+        int y = usable.y + usable.height - BED_HEIGHT;
         return new Point(x, y);
     }
 
+    /** Pet spawns relative to bed (centered). */
     public static Point getCatSnapPosition() {
         Point bedPos = getBedScreenPosition();
 
-        int snapOffsetX = (BED_WIDTH - Main.PET_WIDTH) / 2;
-        int snapOffsetY = -Main.PET_HEIGHT + BED_HEIGHT;
+        int snapX = bedPos.x + (BED_WIDTH - Main.PET_WIDTH) / 2;
+        int snapY = bedPos.y - Main.PET_HEIGHT + BED_HEIGHT;
 
-        int extraX = 0;
-        int extraY = 0;
+        // small tweak constants if you want later
+        int tweakX = 0;
+        int tweakY = 0;
 
-        switch (Theme.getScalePercent()) {
-            case 100 -> {
-                extraX = 0;
-                extraY = 5;
-            }
-            case 125 -> {
-                extraX = -38;
-                extraY = 65;
-            }
-            case 150 -> {
-                extraX = 0;
-                extraY = 100;
-            }
-            case 175 -> {
-                extraX = -10;
-                extraY = -166;
-            }
-            default -> {
-                extraX = -5;
-                extraY = -95;
-            }
-        }
-
-        return new Point(
-                bedPos.x + snapOffsetX + extraX,
-                bedPos.y + snapOffsetY + extraY
-        );
+        return new Point(snapX + tweakX, snapY + tweakY);
     }
 
-    private static class BedPanel extends JPanel {
+    // ─────────────────────────────────────────────────────────────
 
-        private final BufferedImage bedImage;
+    private class BedPanel extends JPanel {
+        private BufferedImage bedImage;
 
         BedPanel() {
             setOpaque(false);
             setPreferredSize(new Dimension(BED_WIDTH, BED_HEIGHT));
-            bedImage = loadBedImage();
+            bedImage = loadImage("dingus - Copy/orangebed.png");
         }
 
-        @Override
-        protected void paintComponent(Graphics g) {
+        void setImage(BufferedImage img) {
+            bedImage = (img != null) ? img : loadImage("dingus - Copy/orangebed.png");
+            repaint();
+        }
+
+        @Override protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-            if (bedImage != null) {
-                g.drawImage(bedImage, 12, 11, getWidth(), getHeight(), this);
-            }
-        }
+            if (bedImage == null) return;
 
-        private static BufferedImage loadBedImage() {
-            try { return ImageIO.read(new File("dingus - Copy/orangebed.png")); }
-            catch (IOException ignored) { return null; }
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            g2.drawImage(bedImage, 0, 0, getWidth(), getHeight(), null);
+            g2.dispose();
         }
+    }
+
+    private static BufferedImage loadImage(String path) {
+        try { return ImageIO.read(new File(path)); }
+        catch (IOException e) { return null; }
     }
 
     private static void AWTUtilities_setWindowOpaque(Window w) {
