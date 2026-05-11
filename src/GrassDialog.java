@@ -10,25 +10,29 @@ public class GrassDialog extends JDialog {
 
     private static final List<GrassDialog> OPEN = new CopyOnWriteArrayList<>();
 
-    // Must match Theme.paintMacWindow() traffic light geometry
+    // Must match Theme.paintMacWindow()
     private static final int TL_X0  = 12;
     private static final int TL_Y0  = 9;
     private static final int TL_DOT = 10;
     private static final int TL_GAP = 6;
 
     private final BufferedImage img;
-    private boolean hidden = false;
+    private final Runnable onClosed;
+    private boolean closedCallbackFired = false;
 
-    public GrassDialog(Window owner, String url) throws Exception {
+    public GrassDialog(Window owner, String url, Runnable onClosed) throws Exception {
         super(owner);
+        this.onClosed = onClosed;
 
         setModal(false);
-        setAlwaysOnTop(false);          // never above Dingus
-        setFocusableWindowState(false); // don't take focus
-        setAutoRequestFocus(false);     // don't request focus when shown
         setUndecorated(true);
         setType(Type.UTILITY);
         setBackground(new Color(0, 0, 0, 0));
+
+        // Keep tabs behind Dingus
+        setAlwaysOnTop(false);
+        setFocusableWindowState(false);
+        setAutoRequestFocus(false);
 
         img = ImageIO.read(new URL(url));
 
@@ -45,65 +49,34 @@ public class GrassDialog extends JDialog {
         };
         root.setOpaque(false);
 
-        // titlebar overlay: hitboxes + drag region
         root.add(buildTitlebarOverlay(), BorderLayout.NORTH);
-
-        // image content area
         root.add(new ImagePane(), BorderLayout.CENTER);
 
         setContentPane(root);
 
         OPEN.add(this);
+
         addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override public void windowClosed(java.awt.event.WindowEvent e) { OPEN.remove(GrassDialog.this); }
-            @Override public void windowClosing(java.awt.event.WindowEvent e) { OPEN.remove(GrassDialog.this); }
+            @Override public void windowClosed(java.awt.event.WindowEvent e) { cleanupAndCallback(); }
+            @Override public void windowClosing(java.awt.event.WindowEvent e) { cleanupAndCallback(); }
         });
     }
 
-    /** Open one grass window near the center of the screen. */
-    public static void openRandom(Window owner, String[] urls) {
-        try {
-            String url = urls[(int)(Math.random() * urls.length)];
-            GrassDialog d = new GrassDialog(owner, url);
-
-            d.setAlwaysOnTop(false);
-            d.setVisible(true);
-
-            // Force grass behind
-            d.toBack();
-
-            // Force Dingus above
-            if (owner != null) {
-                owner.setAlwaysOnTop(true);
-                owner.toFront();
-                owner.repaint();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+    private void cleanupAndCallback() {
+        OPEN.remove(this);
+        if (!closedCallbackFired) {
+            closedCallbackFired = true;
+            if (onClosed != null) SwingUtilities.invokeLater(onClosed);
         }
     }
 
-    /**
-     * If pet bounds intersect any open grass dialog, close ONE and return true.
-     * Called from PetMenu.checkGrassDrop(...) on drag release.
-     */
-    public static boolean consumeIfIntersect(Rectangle petBoundsOnScreen) {
+    public static GrassDialog findIntersecting(Rectangle screenRect) {
         for (GrassDialog d : OPEN) {
             if (!d.isShowing()) continue;
-            if (d.hidden) continue;
-
-            Rectangle r = d.getBounds(); // screen coords
-            if (r.intersects(petBoundsOnScreen)) {
-                SwingUtilities.invokeLater(d::dispose);
-                return true;
-            }
+            if (d.getBounds().intersects(screenRect)) return d;
         }
-        return false;
+        return null;
     }
-
-    // ─────────────────────────────────────────────────────────────
-    // UI parts
-    // ─────────────────────────────────────────────────────────────
 
     private JLayeredPane buildTitlebarOverlay() {
         JLayeredPane layer = new JLayeredPane() {
@@ -122,9 +95,7 @@ public class GrassDialog extends JDialog {
             }
 
             private Component find(String name) {
-                for (Component c : getComponents()) {
-                    if (name.equals(c.getName())) return c;
-                }
+                for (Component c : getComponents()) if (name.equals(c.getName())) return c;
                 return null;
             }
         };
@@ -133,7 +104,7 @@ public class GrassDialog extends JDialog {
         JButton red = makeTrafficHitbox(this::dispose, "Close");
         red.setName("tl_red");
 
-        JButton orange = makeTrafficHitbox(this::toggleHidden, "Hide");
+        JButton orange = makeTrafficHitbox(this::dispose, "Back");
         orange.setName("tl_orange");
 
         JButton green = makeTrafficHitbox(null, null);
@@ -144,12 +115,10 @@ public class GrassDialog extends JDialog {
         layer.add(orange, Integer.valueOf(2));
         layer.add(green, Integer.valueOf(2));
 
-        // drag the window by the titlebar
+        // draggable titlebar
         Point[] offset = {null};
         layer.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override public void mousePressed(java.awt.event.MouseEvent e) {
-                offset[0] = e.getPoint();
-            }
+            @Override public void mousePressed(java.awt.event.MouseEvent e) { offset[0] = e.getPoint(); }
         });
         layer.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
             @Override public void mouseDragged(java.awt.event.MouseEvent e) {
@@ -165,9 +134,7 @@ public class GrassDialog extends JDialog {
 
     private JButton makeTrafficHitbox(Runnable action, String tooltip) {
         JButton b = new JButton() {
-            @Override protected void paintComponent(Graphics g) {
-                // No paint: Theme.paintMacWindow draws the circles
-            }
+            @Override protected void paintComponent(Graphics g) { }
         };
         b.setBorderPainted(false);
         b.setContentAreaFilled(false);
@@ -179,69 +146,36 @@ public class GrassDialog extends JDialog {
         return b;
     }
 
-    private void toggleHidden() {
-        hidden = !hidden;
-        // “Hide” behavior: collapse to a tiny strip under the titlebar
-        if (hidden) {
-            setSize(getWidth(), Theme.TITLEBAR_HEIGHT + 6);
-        } else {
-            setSize(380, 260);
-        }
-        repaint();
-    }
-
     private class ImagePane extends JComponent {
-        @Override public Dimension getPreferredSize() {
-            return new Dimension(380, 260 - Theme.TITLEBAR_HEIGHT);
-        }
-
         @Override protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
-
-            int pad = 12;
-            int top = Theme.TITLEBAR_HEIGHT + 8;
-
-            // content bounds inside the window frame
-            Rectangle box = new Rectangle(
-                    pad,
-                    0, // we are already inside CENTER (below titlebar), so just pad within this component
-                    getWidth() - pad * 2,
-                    getHeight() - pad
-            );
-
-            // background paper
             g2.setColor(Theme.BG_MAIN);
             g2.fillRect(0, 0, getWidth(), getHeight());
 
-            // draw the image inside the content box, aspect-fit (contain)
-            drawImageContain(g2, img, box);
+            int pad = 12;
+            Rectangle box = new Rectangle(pad, pad, getWidth() - pad * 2, getHeight() - pad * 2);
+            drawContain(g2, img, box);
 
-            // ink border around image area
             g2.setColor(Theme.BG_INPUT_BORDER);
-            ((Graphics2D) g2).setStroke(new BasicStroke(2));
+            g2.setStroke(new BasicStroke(2));
             g2.drawRect(box.x, box.y, box.width - 1, box.height - 1);
 
             g2.dispose();
         }
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────
-
     private static Point centerSpawnPoint(int w, int h) {
         Rectangle usable = Theme.getUsableScreen();
         int cx = usable.x + (usable.width  - w) / 2;
         int cy = usable.y + (usable.height - h) / 2;
 
-        // small jitter so multiple opens are not identical
-        int jx = (int) (Math.random() * 120) - 60;
-        int jy = (int) (Math.random() * 120) - 60;
+        int jx = (int) (Math.random() * 140) - 70;
+        int jy = (int) (Math.random() * 140) - 70;
 
         return new Point(cx + jx, cy + jy);
     }
 
-    private static void drawImageContain(Graphics2D g2, BufferedImage img, Rectangle box) {
+    private static void drawContain(Graphics2D g2, BufferedImage img, Rectangle box) {
         if (img == null) return;
 
         double sx = box.width  / (double) img.getWidth();

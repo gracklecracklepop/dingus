@@ -18,7 +18,6 @@ public class Main {
         try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
         catch (Exception ignored) {}
 
-        // UI defaults + tray notifier early (wizard + early warnings)
         Theme.applyUIManagerDefaults();
         TrayNotifier.DEFAULT_ICON_PATH = "images/icon.png";
         TrayNotifier.ensureInitialized();
@@ -45,26 +44,22 @@ public class Main {
                     icon.getScaledInstance(128, 128, Image.SCALE_SMOOTH)
             ));
 
-            // ── Bed ────────────────────────────────────────────────────────────
+            // ── Bed (topmost overlay above taskbar) ─────────────────────────
             BedDialog bed = new BedDialog();
             bed.positionAtBottom();
             bed.setVisible(true);
+            SwingUtilities.invokeLater(bed::bumpTopmost);
 
-            // Bump bed above taskbar, then bring pet above bed.
-            Timer t = new Timer(80, e -> bed.bumpTopmost());
-            t.setRepeats(false);
-            t.start();
-
-            // ── Pet dialog ─────────────────────────────────────────────────────
+            // ── Pet dialog (always on top) ─────────────────────────────────
             JDialog dialog = new JDialog(hiddenOwner);
             dialog.setUndecorated(true);
             dialog.setBackground(new Color(0, 0, 0, 0));
             dialog.setLayout(new BorderLayout());
             dialog.setSize(PET_WIDTH, PET_HEIGHT);
-            dialog.setAlwaysOnTop(true);
             dialog.setResizable(false);
+            dialog.setAlwaysOnTop(true);
 
-            // spawn relative to bed
+            // Place relative to bed
             Point snap = BedDialog.getCatSnapPosition();
             dialog.setLocation(snap.x, snap.y);
 
@@ -79,11 +74,12 @@ public class Main {
 
             dialog.setVisible(true);
 
-            // Keep pet above bed after bed bump
-            new Timer(120, e -> {
+            // Finalize layering once (prevents flicker)
+            SwingUtilities.invokeLater(() -> {
                 dialog.setAlwaysOnTop(true);
                 dialog.toFront();
-            }).start();
+                bed.toBack(); // bed remains topmost vs taskbar, but behind the pet
+            });
 
             imageSaver.startRandomSaving("images/poo.png", 1800, 3600);
         });

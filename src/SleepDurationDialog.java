@@ -39,7 +39,6 @@ public class SleepDurationDialog extends JDialog {
         msg.setFont(Theme.font(Theme.FONT_SIZE_BODY));
         p.add(msg, BorderLayout.NORTH);
 
-        // slider row
         JPanel mid = new JPanel(new BorderLayout(10, 0));
         mid.setOpaque(false);
 
@@ -57,7 +56,6 @@ public class SleepDurationDialog extends JDialog {
         JLabel value = new JLabel(slider.getValue() + " minutes", SwingConstants.CENTER);
         value.setForeground(Theme.TEXT_PRIMARY);
         value.setFont(Theme.font(Theme.FONT_SIZE_LABEL));
-
         slider.addChangeListener(e -> value.setText(slider.getValue() + " minutes"));
 
         mid.add(left, BorderLayout.WEST);
@@ -71,24 +69,16 @@ public class SleepDurationDialog extends JDialog {
 
         p.add(center, BorderLayout.CENTER);
 
-        // buttons row
         JPanel btns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         btns.setOpaque(false);
 
-        JButton cancel = themedButton("Cancel", Theme.BTN_SECONDARY, () -> {
-            minutes = null;
-            dispose();
-        });
-
-        JButton ok = themedButton("Sleep", Theme.BTN_PRIMARY, () -> {
-            minutes = slider.getValue();
-            dispose();
-        });
+        JButton cancel = themedButton("Cancel", Theme.BTN_SECONDARY, () -> { minutes = null; dispose(); });
+        JButton ok     = themedButton("Sleep",   Theme.BTN_PRIMARY,   () -> { minutes = slider.getValue(); dispose(); });
 
         btns.add(cancel);
         btns.add(ok);
-
         p.add(btns, BorderLayout.SOUTH);
+
         return p;
     }
 
@@ -137,6 +127,6 @@ public class SleepDurationDialog extends JDialog {
     public static Integer promptMinutes(Window owner) {
         SleepDurationDialog d = new SleepDurationDialog(owner);
         d.setVisible(true);
-        return d.minutes; // null if cancelled
+        return d.minutes;
     }
 }

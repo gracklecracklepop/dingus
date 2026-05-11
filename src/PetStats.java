@@ -8,12 +8,15 @@ public class PetStats {
     public int energy = 100;
     public int coins = 0;
 
-    // --- saved placement (screen coordinates) ---
+
+
     private Integer bedX, bedY;
+
     public boolean hasBedPos() { return bedX != null && bedY != null; }
     public void setBedPos(int x, int y) { bedX = x; bedY = y; }
     public Integer getBedX() { return bedX; }
     public Integer getBedY() { return bedY; }
+
 
     // --- WIZARD VARIABLES ---
     private String name = "Dingus";

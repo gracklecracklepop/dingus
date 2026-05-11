@@ -7,7 +7,7 @@ import java.io.IOException;
 
 public class BedDialog extends JDialog {
 
-    // Match the "bed area" in PetPanel (baseY = 80)
+    // Match PetPanel's bed-area box (baseY=80)
     public static final int BED_WIDTH  = Main.PET_WIDTH;
     public static final int BED_HEIGHT = Main.PET_HEIGHT - 80;
 
@@ -17,7 +17,7 @@ public class BedDialog extends JDialog {
         setUndecorated(true);
         setBackground(new Color(0, 0, 0, 0));
 
-        // overlay sticker behavior
+        // overlay sticker
         setType(Window.Type.POPUP);
         setAlwaysOnTop(true);
         setFocusableWindowState(false);
@@ -34,7 +34,6 @@ public class BedDialog extends JDialog {
         panel.setImage(img);
     }
 
-    /** Call AFTER setVisible(true) to bump above taskbar/topmost layers. */
     public void bumpTopmost() {
         try {
             setAlwaysOnTop(false);
@@ -63,17 +62,12 @@ public class BedDialog extends JDialog {
         return new Point(x, y);
     }
 
-    /** Pet snaps relative to bed. */
     public static Point getCatSnapPosition() {
         Point bedPos = getBedScreenPosition();
-
-        int snapX = bedPos.x; // since BED_WIDTH == PET_WIDTH
-        int snapY = bedPos.y - Main.PET_HEIGHT + BED_HEIGHT; // aligns bed-area in pet window
-
+        int snapX = bedPos.x;
+        int snapY = bedPos.y - Main.PET_HEIGHT + BED_HEIGHT;
         return new Point(snapX, snapY);
     }
-
-    // ─────────────────────────────────────────────────────────────
 
     private static class BedPanel extends JPanel {
         private BufferedImage bedImage;
@@ -97,9 +91,7 @@ public class BedDialog extends JDialog {
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                     RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
 
-            // NO STRETCH: draw contain (aspect preserved)
             drawContain(g2, bedImage, new Rectangle(0, 0, getWidth(), getHeight()));
-
             g2.dispose();
         }
 
@@ -112,15 +104,11 @@ public class BedDialog extends JDialog {
     private static void drawContain(Graphics2D g2, BufferedImage img, Rectangle box) {
         int iw = img.getWidth();
         int ih = img.getHeight();
-
-        double sx = box.width  / (double) iw;
-        double sy = box.height / (double) ih;
-        double s = Math.min(sx, sy);
+        double s = Math.min(box.width / (double) iw, box.height / (double) ih);
 
         int dw = (int) Math.round(iw * s);
         int dh = (int) Math.round(ih * s);
-
-        int dx = box.x + (box.width  - dw) / 2;
+        int dx = box.x + (box.width - dw) / 2;
         int dy = box.y + (box.height - dh) / 2;
 
         g2.drawImage(img, dx, dy, dw, dh, null);

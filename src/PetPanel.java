@@ -11,6 +11,9 @@ public class PetPanel extends JPanel {
     private static final int BUTTON_SIZE = 30;
     private static final int SNAP_MARGIN = 60;
 
+    private static final int BASE_Y = 80;
+    private static final int DRAG_EXTRA_Y = 100;
+
     private final PetStats stats;
 
     private BufferedImage normalImage;
@@ -27,21 +30,23 @@ public class PetPanel extends JPanel {
     private BedDialog bed;
 
     private boolean isDragging = false;
-    private boolean isInBed = true;     // START IN BED
+    private boolean isInBed = true; // start in bed
     private int preDragHeight = -1;
 
     private static final Cursor CURSOR_DEFAULT = Cursor.getDefaultCursor();
+
+    // proportional scaling based on sitting sprite
+    private double baseScale = -1;
+    private int lastBoxW = -1, lastBoxH = -1;
 
     public PetPanel(JDialog dialog) {
         this.dialog = dialog;
         setLayout(null);
 
         this.stats = SaveManager.load();
-
         setimages(stats.getSpriteColor());
 
-        // First image on execution: cat in bed
-        currentImage = bedImage;
+        currentImage = bedImage; // first image is cat-in-bed
 
         menu = new PetMenu(stats, dialog, () -> applyAppearanceFromStats(stats));
 
@@ -53,11 +58,10 @@ public class PetPanel extends JPanel {
     public void setBedDialog(BedDialog bed) {
         this.bed = bed;
 
-        // bed-alone sprite based on current color
         bed.setBedSprite(bedAlone);
         bed.positionAtBottom();
 
-        // since we start in bed, hide the bed-alone window
+        // start in bed => hide bed-only window
         bed.setVisible(!isInBed);
 
         repaint();
@@ -66,6 +70,8 @@ public class PetPanel extends JPanel {
     public void applyAppearanceFromStats(PetStats s) {
         setimages(s.getSpriteColor());
         if (bed != null) bed.setBedSprite(bedAlone);
+
+        baseScale = -1;
 
         if (isDragging) currentImage = (dragImage != null) ? dragImage : normalImage;
         else if (isInBed) currentImage = bedImage;
@@ -106,6 +112,8 @@ public class PetPanel extends JPanel {
         if (dragImage == null) dragImage = normalImage;
         if (bedImage == null) bedImage = normalImage;
         if (bedAlone == null) bedAlone = loadImage("dingus - Copy/orangebed.png");
+
+        baseScale = -1;
     }
 
     public void setDragging(boolean dragging) {
@@ -114,9 +122,11 @@ public class PetPanel extends JPanel {
         if (dragging) {
             preDragHeight = dialog.getHeight();
 
-            // picking up = not in bed
             isInBed = false;
-            if (bed != null) bed.setVisible(true);
+            if (bed != null) {
+                bed.setVisible(true);
+                bed.toBack();
+            }
 
             currentImage = (dragImage != null) ? dragImage : normalImage;
 
@@ -136,6 +146,7 @@ public class PetPanel extends JPanel {
                 preDragHeight = -1;
             }
 
+            // ONLY place where stats update for grass: on drag release
             try { menu.checkGrassDrop(dialog.getBounds()); } catch (Throwable ignored) {}
 
             if (isNearBed()) {
@@ -146,7 +157,10 @@ public class PetPanel extends JPanel {
             } else {
                 isInBed = false;
                 currentImage = normalImage;
-                if (bed != null) bed.setVisible(true);
+                if (bed != null) {
+                    bed.setVisible(true);
+                    bed.toBack();
+                }
             }
 
             menuToggleButton.setVisible(true);
@@ -260,27 +274,33 @@ public class PetPanel extends JPanel {
         catch (IOException e) { System.err.println("Missing image: " + path); return null; }
     }
 
-    private static void drawContain(Graphics2D g2, BufferedImage img, Rectangle box) {
-        if (img == null) return;
-        int iw = img.getWidth();
-        int ih = img.getHeight();
+    private void recomputeBaseScaleIfNeeded(Rectangle box) {
+        if (normalImage == null) return;
+        if (baseScale > 0 && box.width == lastBoxW && box.height == lastBoxH) return;
 
-        double sx = box.width  / (double) iw;
-        double sy = box.height / (double) ih;
-        double s = Math.min(sx, sy);
+        lastBoxW = box.width;
+        lastBoxH = box.height;
 
-        int dw = (int) Math.round(iw * s);
-        int dh = (int) Math.round(ih * s);
-
-        int dx = box.x + (box.width  - dw) / 2;
-        int dy = box.y + (box.height - dh) / 2;
-
-        g2.drawImage(img, dx, dy, dw, dh, null);
+        double sx = box.width  / (double) normalImage.getWidth();
+        double sy = box.height / (double) normalImage.getHeight();
+        baseScale = Math.min(sx, sy);
     }
 
-    private static void drawImageAspect(Graphics2D g2, BufferedImage img, Rectangle box) {
-        // same as contain
-        drawContain(g2, img, box);
+    private static double maxScaleToFit(BufferedImage img, Rectangle box) {
+        if (img == null) return 1.0;
+        return Math.min(box.width / (double) img.getWidth(), box.height / (double) img.getHeight());
+    }
+
+    private static void drawWithScaleBottomAligned(Graphics2D g2, BufferedImage img, Rectangle box, double scale) {
+        if (img == null || scale <= 0) return;
+
+        int dw = (int) Math.round(img.getWidth() * scale);
+        int dh = (int) Math.round(img.getHeight() * scale);
+
+        int dx = box.x + (box.width - dw) / 2;
+        int dy = box.y + (box.height - dh); // bottom aligned
+
+        g2.drawImage(img, dx, dy, dw, dh, null);
     }
 
     @Override
@@ -291,19 +311,30 @@ public class PetPanel extends JPanel {
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                 RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
 
-        int baseY = 80;
-        int dragYOffset = 100;
+        Rectangle spriteBox = new Rectangle(
+                0,
+                BASE_Y + (isDragging ? DRAG_EXTRA_Y : 0),
+                getWidth(),
+                BedDialog.BED_HEIGHT
+        );
 
-        if (isDragging) {
-            Rectangle box = new Rectangle(0, baseY + dragYOffset, getWidth(), BedDialog.BED_HEIGHT);
-            drawImageAspect(g2, currentImage, box);
-        } else if (isInBed) {
-            // NO STRETCH: draw contain into same bed-area box as the bed-only window
-            Rectangle box = new Rectangle(0, baseY, BedDialog.BED_WIDTH, BedDialog.BED_HEIGHT);
-            drawContain(g2, currentImage, box);
+        recomputeBaseScaleIfNeeded(spriteBox);
+
+        if (isInBed && !isDragging) {
+            // Bed sprite: aspect preserved within the same bed-area box
+            double s = maxScaleToFit(currentImage, new Rectangle(0, BASE_Y, BedDialog.BED_WIDTH, BedDialog.BED_HEIGHT));
+            drawWithScaleBottomAligned(g2, currentImage,
+                    new Rectangle(0, BASE_Y, BedDialog.BED_WIDTH, BedDialog.BED_HEIGHT), s);
+
+        } else if (isDragging) {
+            double clamp = maxScaleToFit(currentImage, spriteBox);
+            double s = (baseScale > 0) ? Math.min(baseScale, clamp) : clamp;
+            drawWithScaleBottomAligned(g2, currentImage, spriteBox, s);
+
         } else {
-            Rectangle box = new Rectangle(0, baseY, getWidth(), BedDialog.BED_HEIGHT);
-            drawImageAspect(g2, currentImage, box);
+            double clamp = maxScaleToFit(currentImage, spriteBox);
+            double s = (baseScale > 0) ? Math.min(baseScale, clamp) : clamp;
+            drawWithScaleBottomAligned(g2, currentImage, spriteBox, s);
         }
 
         g2.dispose();
