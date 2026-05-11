@@ -19,10 +19,12 @@ public class Main {
         catch (Exception ignored) {}
 
         Theme.applyUIManagerDefaults();
+
         TrayNotifier.DEFAULT_ICON_PATH = "images/icon.png";
         TrayNotifier.ensureInitialized();
 
         SwingUtilities.invokeLater(() -> {
+            // First-time setup
             if (!SaveManager.saveExists()) {
                 SetupWizard wizard = new SetupWizard();
                 wizard.setVisible(true);
@@ -30,6 +32,7 @@ public class Main {
                 SaveManager.save(wizard.getGeneratedStats());
             }
 
+            // Hidden owner keeps dialogs grouped
             JFrame hiddenOwner = new JFrame();
             hiddenOwner.setUndecorated(true);
             hiddenOwner.setSize(0, 0);
@@ -44,13 +47,13 @@ public class Main {
                     icon.getScaledInstance(128, 128, Image.SCALE_SMOOTH)
             ));
 
-            // ── Bed (topmost overlay above taskbar) ─────────────────────────
+            // ── Bed dialog: CREATE + POSITION, but DO NOT SHOW at boot ─────────
+            // This prevents the “bed only” flash.
             BedDialog bed = new BedDialog();
             bed.positionAtBottom();
-            bed.setVisible(true);
-            SwingUtilities.invokeLater(bed::bumpTopmost);
+            bed.setVisible(false);
 
-            // ── Pet dialog (always on top) ─────────────────────────────────
+            // ── Pet dialog ─────────────────────────────────────────────────────
             JDialog dialog = new JDialog(hiddenOwner);
             dialog.setUndecorated(true);
             dialog.setBackground(new Color(0, 0, 0, 0));
@@ -59,7 +62,7 @@ public class Main {
             dialog.setResizable(false);
             dialog.setAlwaysOnTop(true);
 
-            // Place relative to bed
+            // Spawn relative to bed position (works even if bed is hidden)
             Point snap = BedDialog.getCatSnapPosition();
             dialog.setLocation(snap.x, snap.y);
 
@@ -67,6 +70,7 @@ public class Main {
             panel.setOpaque(false);
             dialog.add(panel, BorderLayout.CENTER);
 
+            // Give panel bed reference (panel will keep bed hidden at start because isInBed=true)
             panel.setBedDialog(bed);
 
             PetTray.setup(dialog, bed, icon);
@@ -74,11 +78,10 @@ public class Main {
 
             dialog.setVisible(true);
 
-            // Finalize layering once (prevents flicker)
+            // Ensure pet is topmost
             SwingUtilities.invokeLater(() -> {
                 dialog.setAlwaysOnTop(true);
                 dialog.toFront();
-                bed.toBack(); // bed remains topmost vs taskbar, but behind the pet
             });
 
             imageSaver.startRandomSaving("images/poo.png", 1800, 3600);
@@ -137,42 +140,11 @@ public class Main {
         g.setColor(new Color(255, 200, 100));
         g.fillOval(8, 16, 48, 44);
 
-        drawEar(g, new int[]{8, 16, 24},  new int[]{24, 4, 24});
-        drawEar(g, new int[]{40, 48, 56}, new int[]{24, 4, 24});
-
-        g.setColor(new Color(255, 150, 150));
-        drawEar(g, new int[]{12, 16, 20}, new int[]{22, 10, 22});
-        drawEar(g, new int[]{44, 48, 52}, new int[]{22, 10, 22});
-
         g.setColor(Color.BLACK);
         g.fillOval(20, 32, 8, 10);
         g.fillOval(36, 32, 8, 10);
 
-        g.setColor(Color.WHITE);
-        g.fillOval(22, 34, 3, 3);
-        g.fillOval(38, 34, 3, 3);
-
-        g.setColor(new Color(255, 150, 150));
-        g.fillPolygon(new int[]{32, 28, 36}, new int[]{44, 50, 50}, 3);
-
-        g.setColor(Color.BLACK);
-        g.setStroke(new BasicStroke(1.5F));
-        g.drawArc(24, 48, 8, 6, 0, -180);
-        g.drawArc(32, 48, 8, 6, 0, -180);
-
-        g.drawLine(8,  44, 20, 46);
-        g.drawLine(8,  48, 20, 48);
-        g.drawLine(8,  52, 20, 50);
-
-        g.drawLine(56, 44, 44, 46);
-        g.drawLine(56, 48, 44, 48);
-        g.drawLine(56, 52, 44, 50);
-
         g.dispose();
         return img;
-    }
-
-    private static void drawEar(Graphics2D g, int[] xs, int[] ys) {
-        g.fillPolygon(xs, ys, 3);
     }
 }

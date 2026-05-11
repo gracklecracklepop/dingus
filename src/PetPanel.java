@@ -18,8 +18,8 @@ public class PetPanel extends JPanel {
 
     private BufferedImage normalImage;
     private BufferedImage dragImage;
-    private BufferedImage bedImage;   // cat in bed sprite
-    private BufferedImage bedAlone;   // bed only sprite
+    private BufferedImage bedImage;   // cat-in-bed sprite
+    private BufferedImage bedAlone;   // bed-only sprite
     private BufferedImage currentImage;
 
     private final JButton menuToggleButton;
@@ -35,7 +35,7 @@ public class PetPanel extends JPanel {
 
     private static final Cursor CURSOR_DEFAULT = Cursor.getDefaultCursor();
 
-    // proportional scaling based on sitting sprite
+    // proportional scaling based on normal sitting sprite
     private double baseScale = -1;
     private int lastBoxW = -1, lastBoxH = -1;
 
@@ -46,7 +46,7 @@ public class PetPanel extends JPanel {
         this.stats = SaveManager.load();
         setimages(stats.getSpriteColor());
 
-        currentImage = bedImage; // first image is cat-in-bed
+        currentImage = bedImage; // first image on launch: cat in bed
 
         menu = new PetMenu(stats, dialog, () -> applyAppearanceFromStats(stats));
 
@@ -54,6 +54,8 @@ public class PetPanel extends JPanel {
         menuToggleButton.setBounds(5, 85, BUTTON_SIZE, BUTTON_SIZE);
         add(menuToggleButton);
     }
+
+    // ── Public API ──────────────────────────────────────────────
 
     public void setBedDialog(BedDialog bed) {
         this.bed = bed;
@@ -63,6 +65,11 @@ public class PetPanel extends JPanel {
 
         // start in bed => hide bed-only window
         bed.setVisible(!isInBed);
+
+        SwingUtilities.invokeLater(() -> {
+            dialog.setAlwaysOnTop(true);
+            dialog.toFront();
+        });
 
         repaint();
     }
@@ -116,18 +123,33 @@ public class PetPanel extends JPanel {
         baseScale = -1;
     }
 
+    // ── Drag control ────────────────────────────────────────────
+
     public void setDragging(boolean dragging) {
+        // When drag starts: close menu FIRST (before isDragging becomes true)
+        if (dragging) {
+            if (menuVisible) forceCloseMenu();
+            menuToggleButton.setVisible(false);
+        }
+
         this.isDragging = dragging;
 
         if (dragging) {
             preDragHeight = dialog.getHeight();
 
             isInBed = false;
+
+            // show bed-only window again
             if (bed != null) {
                 bed.setVisible(true);
-                bed.toBack();
+                SwingUtilities.invokeLater(() -> {
+                    bed.bumpTopmost();          // bed stays over taskbar
+                    dialog.setAlwaysOnTop(true);
+                    dialog.toFront();           // cat stays above bed
+                });
             }
 
+            // switch to drag sprite
             currentImage = (dragImage != null) ? dragImage : normalImage;
 
             dialog.setResizable(true);
@@ -146,7 +168,7 @@ public class PetPanel extends JPanel {
                 preDragHeight = -1;
             }
 
-            // ONLY place where stats update for grass: on drag release
+            // Grass reward check only on release
             try { menu.checkGrassDrop(dialog.getBounds()); } catch (Throwable ignored) {}
 
             if (isNearBed()) {
@@ -157,9 +179,14 @@ public class PetPanel extends JPanel {
             } else {
                 isInBed = false;
                 currentImage = normalImage;
+
                 if (bed != null) {
                     bed.setVisible(true);
-                    bed.toBack();
+                    SwingUtilities.invokeLater(() -> {
+                        bed.bumpTopmost();
+                        dialog.setAlwaysOnTop(true);
+                        dialog.toFront();
+                    });
                 }
             }
 
@@ -170,10 +197,13 @@ public class PetPanel extends JPanel {
     }
 
     public boolean isOverMenuButton(Point p) {
+        // Never allow toggle during drag
+        if (isDragging) return false;
         if (!menuToggleButton.isVisible()) return false;
-        return p.x >= 5 && p.x <= 5 + BUTTON_SIZE
-                && p.y >= 85 && p.y <= 85 + BUTTON_SIZE;
+        return menuToggleButton.getBounds().contains(p);
     }
+
+    // ── Bed detection ────────────────────────────────────────────
 
     private boolean isNearBed() {
         if (bed == null) return false;
@@ -191,22 +221,38 @@ public class PetPanel extends JPanel {
         dialog.setLocation(BedDialog.getCatSnapPosition());
     }
 
+    // ── Menu toggle (power / X) ──────────────────────────────────
+
     private void toggleMenu() {
+        if (isDragging) return; // hard guard
+
         menuVisible = !menuVisible;
 
         if (menuVisible) {
+            menuToggleButton.setToolTipText("Close menu");
             dialog.setSize(Main.PET_WIDTH + Theme.MENU_WIDTH, Main.PET_HEIGHT);
             dialog.setLocation(dialog.getX() - Theme.MENU_WIDTH, dialog.getY());
             dialog.add(menu.getPanel(), BorderLayout.WEST);
-            menuToggleButton.setToolTipText("Close menu");
         } else {
-            dialog.remove(menu.getPanel());
-            dialog.setSize(Main.PET_WIDTH, Main.PET_HEIGHT);
-            dialog.setLocation(dialog.getX() + Theme.MENU_WIDTH, dialog.getY());
-            menuToggleButton.setToolTipText("Open menu");
+            forceCloseMenu();
         }
 
         menuToggleButton.repaint();
+        dialog.revalidate();
+        dialog.repaint();
+    }
+
+    /** Closes the menu even if called during drag-start (does NOT check isDragging). */
+    private void forceCloseMenu() {
+        if (!menuVisible) return;
+
+        menuVisible = false;
+        menuToggleButton.setToolTipText("Open menu");
+
+        dialog.remove(menu.getPanel());
+        dialog.setSize(Main.PET_WIDTH, Main.PET_HEIGHT);
+        dialog.setLocation(dialog.getX() + Theme.MENU_WIDTH, dialog.getY());
+
         dialog.revalidate();
         dialog.repaint();
     }
@@ -274,6 +320,8 @@ public class PetPanel extends JPanel {
         catch (IOException e) { System.err.println("Missing image: " + path); return null; }
     }
 
+    // ── Proportional drawing ─────────────────────────────────────
+
     private void recomputeBaseScaleIfNeeded(Rectangle box) {
         if (normalImage == null) return;
         if (baseScale > 0 && box.width == lastBoxW && box.height == lastBoxH) return;
@@ -298,7 +346,7 @@ public class PetPanel extends JPanel {
         int dh = (int) Math.round(img.getHeight() * scale);
 
         int dx = box.x + (box.width - dw) / 2;
-        int dy = box.y + (box.height - dh); // bottom aligned
+        int dy = box.y + (box.height - dh);
 
         g2.drawImage(img, dx, dy, dw, dh, null);
     }
@@ -320,22 +368,10 @@ public class PetPanel extends JPanel {
 
         recomputeBaseScaleIfNeeded(spriteBox);
 
-        if (isInBed && !isDragging) {
-            // Bed sprite: aspect preserved within the same bed-area box
-            double s = maxScaleToFit(currentImage, new Rectangle(0, BASE_Y, BedDialog.BED_WIDTH, BedDialog.BED_HEIGHT));
-            drawWithScaleBottomAligned(g2, currentImage,
-                    new Rectangle(0, BASE_Y, BedDialog.BED_WIDTH, BedDialog.BED_HEIGHT), s);
+        double clamp = maxScaleToFit(currentImage, spriteBox);
+        double s = (baseScale > 0) ? Math.min(baseScale, clamp) : clamp;
 
-        } else if (isDragging) {
-            double clamp = maxScaleToFit(currentImage, spriteBox);
-            double s = (baseScale > 0) ? Math.min(baseScale, clamp) : clamp;
-            drawWithScaleBottomAligned(g2, currentImage, spriteBox, s);
-
-        } else {
-            double clamp = maxScaleToFit(currentImage, spriteBox);
-            double s = (baseScale > 0) ? Math.min(baseScale, clamp) : clamp;
-            drawWithScaleBottomAligned(g2, currentImage, spriteBox, s);
-        }
+        drawWithScaleBottomAligned(g2, currentImage, spriteBox, s);
 
         g2.dispose();
     }
