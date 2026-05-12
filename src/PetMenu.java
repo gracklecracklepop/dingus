@@ -46,6 +46,32 @@ public class PetMenu {
     // ── Sleep ────────────────────────────────────────────────────
     private Timer sleepTimer;
 
+    // ── Sleep tuning ────────────────────────────────────────────────
+// How quickly sleep becomes effective (bigger = slower)
+    private static final double SLEEP_HALF_LIFE_MIN = 45.0;
+
+    // Maximum energy you can restore purely from sleep (before clamping to 100)
+    private static final int MAX_SLEEP_GAIN = 90;
+
+    private static int clampInt(int v, int lo, int hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+    /**
+     * Returns the ENERGY TARGET after sleeping `minutes`, starting from `startEnergy`.
+     * More minutes => more gain, up to 100.
+     */
+    private int computeSleepTargetEnergy(int startEnergy, int minutes) {
+        minutes = clampInt(minutes, 1, 180);
+
+        // Exponential “rest curve”: gain rises quickly early, then slows (feels natural)
+        // gain = MAX_GAIN * (1 - exp(-minutes / halfLife))
+        double gain = MAX_SLEEP_GAIN * (1.0 - Math.exp(-minutes / SLEEP_HALF_LIFE_MIN));
+        int gainInt = (int) Math.round(gain);
+
+        return clampInt(startEnergy + gainInt, 0, 100);
+    }
+
     // ── Touch Grass mini-game ────────────────────────────────────
     private boolean grassGameActive = false;
     private GrassDialog currentGrassTab = null;
@@ -284,6 +310,11 @@ public class PetMenu {
         Integer minutes = SleepDurationDialog.promptMinutes(hostDialog);
         if (minutes == null) return;
 
+        if (stats.getEnergy() >= 100) {
+            TrayNotifier.showNotification("Dingus", "I’m not tired right now.", TrayIcon.MessageType.INFO);
+            return;
+        }
+
         TrayNotifier.showNotification("Dingus", "Goodnight... see you soon.", TrayIcon.MessageType.INFO);
         startSleepForMinutes(minutes);
     }
@@ -291,34 +322,49 @@ public class PetMenu {
     private void startSleepForMinutes(int minutes) {
         if (sleepTimer != null) sleepTimer.stop();
 
-        // stop grass game during sleep
-        stopTouchGrassGame();
+        // stop grass game during sleep (if you have it)
+        // stopTouchGrassGame();
 
-        final int startEnergy = stats.getEnergy();
+        minutes = clampInt(minutes, 1, 180);
+
+        final int startEnergy  = clampInt(stats.getEnergy(), 0, 100);
+        final int targetEnergy = computeSleepTargetEnergy(startEnergy, minutes);
         final int totalSeconds = minutes * 60;
 
+        // Hide pet while sleeping
         PetTray.hide(hostDialog);
 
+        // If target == start, just wait then show again (still “slept”)
         final int[] elapsed = {0};
         sleepTimer = new Timer(1000, e -> {
             elapsed[0]++;
 
             double t = Math.min(1.0, elapsed[0] / (double) totalSeconds);
-            int newEnergy = (int) Math.round(startEnergy + (100 - startEnergy) * t);
+
+            // Interpolate to the TARGET (not always 100)
+            int newEnergy = (int) Math.round(startEnergy + (targetEnergy - startEnergy) * t);
+            newEnergy = clampInt(newEnergy, 0, 100);
 
             stats.setEnergy(newEnergy);
-            save();
+            SaveManager.save(stats);
 
             if (elapsed[0] >= totalSeconds) {
                 sleepTimer.stop();
-                stats.setEnergy(100);
-                save();
+
+                // Ensure exactly target at end
+                stats.setEnergy(targetEnergy);
+                SaveManager.save(stats);
 
                 PetTray.show(hostDialog);
-                TrayNotifier.showNotification("Dingus", "I feel rested!", TrayIcon.MessageType.INFO);
+                TrayNotifier.showNotification(
+                        "Dingus",
+                        "I woke up! Energy: " + targetEnergy + "%.",
+                        TrayIcon.MessageType.INFO
+                );
                 maybeNotifyThresholds();
             }
         });
+
         sleepTimer.start();
     }
 
@@ -430,7 +476,10 @@ public class PetMenu {
         addButton(content, "😴 Sleep", this::startSleepPrompt);
 
         addButton(content, "🛒 Shop", () -> {
-            ShopDialog shop = new ShopDialog(hostDialog, stats, this::refreshFromStats);
+            ShopDialog shop = new ShopDialog(hostDialog, hostDialog, stats, () -> {
+                refreshFromStats();
+                if (onExternalStatsChanged != null) onExternalStatsChanged.run(); // repaint pet
+            });
             shop.setVisible(true);
         });
 

@@ -17,6 +17,53 @@ public class PetStats {
     public Integer getBedX() { return bedX; }
     public Integer getBedY() { return bedY; }
 
+    // --- Equipped cosmetics ---
+    private String equippedHatId = null;     // null = none
+    private int hatColorRGB = 0xFF1F1B16;    // default ink
+
+    public String getEquippedHatId() { return equippedHatId; }
+    public void setEquippedHatId(String id) { this.equippedHatId = id; }
+
+    public int getHatColorRGB() { return hatColorRGB; }
+    public void setHatColorRGB(int rgb) { this.hatColorRGB = rgb; }
+    // ── Hat size scale (saved) ─────────────────────────────────────
+// 1.0 = default size
+    private double hatScaleNormal = 1.00;
+    private double hatScaleBed    = 1.00;
+    private double hatScaleDrag   = 1.00;
+
+    public double getHatScaleNormal() { return hatScaleNormal; }
+    public double getHatScaleBed()    { return hatScaleBed; }
+    public double getHatScaleDrag()   { return hatScaleDrag; }
+
+    public void setHatScaleNormal(double v) { hatScaleNormal = v; }
+    public void setHatScaleBed(double v)    { hatScaleBed = v; }
+
+    // ── Hat placement anchors (saved, 0..1 fractions) ───────────────
+    private double headNormalXFrac = 0.20;
+    private double headNormalYFrac = 0.08;
+
+    private double headBedXFrac    = 0.68;
+    private double headBedYFrac    = 0.12;
+
+    private double headDragXFrac   = 0.62;
+    private double headDragYFrac   = 0.07;
+
+    public double getHeadNormalXFrac() { return headNormalXFrac; }
+    public double getHeadNormalYFrac() { return headNormalYFrac; }
+    public double getHeadBedXFrac()    { return headBedXFrac; }
+    public double getHeadBedYFrac()    { return headBedYFrac; }
+    public double getHeadDragXFrac()   { return headDragXFrac; }
+    public double getHeadDragYFrac()   { return headDragYFrac; }
+
+    public void setHeadNormalXFrac(double v) { headNormalXFrac = v; }
+    public void setHeadNormalYFrac(double v) { headNormalYFrac = v; }
+    public void setHeadBedXFrac(double v)    { headBedXFrac = v; }
+    public void setHeadBedYFrac(double v)    { headBedYFrac = v; }
+    public void setHeadDragXFrac(double v)   { headDragXFrac = v; }
+    public void setHeadDragYFrac(double v)   { headDragYFrac = v; }
+
+
 
     // --- WIZARD VARIABLES ---
     private String name = "Dingus";

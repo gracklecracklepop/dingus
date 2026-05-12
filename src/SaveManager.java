@@ -1,6 +1,7 @@
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -11,7 +12,9 @@ public class SaveManager {
 
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
-            .enable(SerializationFeature.INDENT_OUTPUT);
+            .enable(SerializationFeature.INDENT_OUTPUT)
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
     // Saves to ~/.dingus/save_data.json so it survives across runs
     private static final Path SAVE_DIR  = Paths.get(System.getProperty("user.home"), ".dingus");
     private static final Path SAVE_FILE = SAVE_DIR.resolve("save_data.json");

@@ -20,7 +20,7 @@ public class Main {
 
         Theme.applyUIManagerDefaults();
 
-        TrayNotifier.DEFAULT_ICON_PATH = "images/icon.png";
+        TrayNotifier.DEFAULT_ICON_PATH = "images/yarn_icon.png";
         TrayNotifier.ensureInitialized();
 
         SwingUtilities.invokeLater(() -> {

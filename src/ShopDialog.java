@@ -6,20 +6,21 @@ public class ShopDialog extends JDialog {
 
     private final PetStats stats;
     private final Runnable onCoinsChanged;
+    private final Window petWindow; // Dingus window (used for accessory placement overlay)
 
     private JLabel coinLabel;
 
     // Must match Theme.paintMacWindow() traffic light geometry
-    // (If you change these in Theme, change them here too.)
     private static final int TL_X0  = 12;
     private static final int TL_Y0  = 9;
     private static final int TL_DOT = 10;
     private static final int TL_GAP = 6;
 
-    public ShopDialog(Window owner, PetStats stats, Runnable onCoinsChanged) {
+    public ShopDialog(Window owner, Window petWindow, PetStats stats, Runnable onCoinsChanged) {
         super(owner);
         this.stats = stats;
         this.onCoinsChanged = onCoinsChanged;
+        this.petWindow = petWindow;
 
         setModal(true);
         setSize(520, 620);
@@ -44,7 +45,7 @@ public class ShopDialog extends JDialog {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Titlebar overlay: invisible hitboxes + coins on TOP RIGHT
+    // Titlebar overlay: hitboxes + coins on TOP RIGHT
     // ─────────────────────────────────────────────────────────────
 
     private JLayeredPane buildTitlebarOverlay() {
@@ -54,7 +55,6 @@ public class ShopDialog extends JDialog {
             }
 
             @Override public void doLayout() {
-                // Hitboxes over Theme’s drawn dots
                 Component red = find("tl_red");
                 Component org = find("tl_orange");
                 Component grn = find("tl_green");
@@ -63,26 +63,20 @@ public class ShopDialog extends JDialog {
                 if (org != null) org.setBounds(TL_X0 + (TL_DOT + TL_GAP), TL_Y0, TL_DOT, TL_DOT);
                 if (grn != null) grn.setBounds(TL_X0 + 2 * (TL_DOT + TL_GAP), TL_Y0, TL_DOT, TL_DOT);
 
-                // Coins on the RIGHT side of the titlebar
                 if (coinLabel != null) {
                     Dimension ps = coinLabel.getPreferredSize();
-                    int rightPad = 12;            // closer to corner
-                    int x = getWidth() - rightPad - ps.width;
-                    int y = 5;
-                    coinLabel.setBounds(x, y, ps.width, ps.height + 2);
+                    int x = getWidth() - 12 - ps.width;
+                    coinLabel.setBounds(x, 5, ps.width, ps.height + 2);
                 }
             }
 
             private Component find(String name) {
-                for (Component c : getComponents()) {
-                    if (name.equals(c.getName())) return c;
-                }
+                for (Component c : getComponents()) if (name.equals(c.getName())) return c;
                 return null;
             }
         };
         layer.setOpaque(false);
 
-        // Red/orange just close this dialog (not exit the whole app)
         JButton red = makeTrafficHitbox(this::dispose, "Close");
         red.setName("tl_red");
 
@@ -97,11 +91,10 @@ public class ShopDialog extends JDialog {
         layer.add(orange, Integer.valueOf(2));
         layer.add(green, Integer.valueOf(2));
 
-        coinLabel = Theme.mixedLabel("🪙 " + stats.getCoins(),
-                Theme.FONT_SIZE_LABEL, Theme.ACCENT_COINS);
+        coinLabel = Theme.mixedLabel("🪙 " + stats.getCoins(), Theme.FONT_SIZE_LABEL, Theme.ACCENT_COINS);
         layer.add(coinLabel, Integer.valueOf(1));
 
-        // Drag window by titlebar region
+        // Drag window by titlebar
         Point[] offset = {null};
         layer.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override public void mousePressed(java.awt.event.MouseEvent e) { offset[0] = e.getPoint(); }
@@ -119,9 +112,7 @@ public class ShopDialog extends JDialog {
 
     private JButton makeTrafficHitbox(Runnable action, String tooltip) {
         JButton b = new JButton() {
-            @Override protected void paintComponent(Graphics g) {
-                // No paint. Theme.paintMacWindow draws the circles.
-            }
+            @Override protected void paintComponent(Graphics g) { /* Theme draws dots */ }
         };
         b.setBorderPainted(false);
         b.setContentAreaFilled(false);
@@ -140,8 +131,6 @@ public class ShopDialog extends JDialog {
     private JPanel buildBody() {
         JPanel body = new JPanel(new BorderLayout(0, 10));
         body.setOpaque(false);
-
-        // push content below the titlebar divider line
         body.setBorder(BorderFactory.createEmptyBorder(10, 12, 12, 12));
 
         JLabel title = Theme.mixedLabel("🛒 ACCESSORY SHOP", Theme.FONT_SIZE_HEADING, Theme.TEXT_PRIMARY);
@@ -151,11 +140,8 @@ public class ShopDialog extends JDialog {
         JPanel grid = new JPanel(new GridLayout(0, 3, 12, 12));
         grid.setOpaque(false);
 
-        // You can keep your emoji list; it will render the same as before.
-        String[] icons = {"🎩", "👓", "🎀", "👑", "🎒", "🧣", "🎧", "🌸", "🕶️", "🧢"};
-
-        for (int i = 0; i < 21; i++) {
-            grid.add(createShopSlot(icons[i % icons.length], (i + 1) * 10, "acc_" + i));
+        for (StoreItem it : AccessoryCatalog.SHOP_ITEMS) {
+            grid.add(createShopSlot(it));
         }
 
         JScrollPane scroll = new JScrollPane(grid);
@@ -170,20 +156,40 @@ public class ShopDialog extends JDialog {
         bar.setUI(createThinScrollBarUI());
 
         body.add(scroll, BorderLayout.CENTER);
+
+        // Footer: Customize button (ONLY place you can set accessory position)
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        footer.setOpaque(false);
+
+        JButton customize = themedButton("Customize", Theme.BTN_SECONDARY, () -> {
+            AccessoryCustomizerDialog d = new AccessoryCustomizerDialog(
+                    this,            // owner dialog
+                    petWindow,       // target pet window for overlay placement
+                    stats,
+                    () -> {
+                        SaveManager.save(stats);
+                        updateCoinsUI();
+                        if (onCoinsChanged != null) onCoinsChanged.run();
+                    }
+            );
+            d.setVisible(true);
+        });
+
+        footer.add(customize);
+        body.add(footer, BorderLayout.SOUTH);
+
         return body;
     }
 
-    private JPanel createShopSlot(String icon, int price, String itemId) {
+    private JPanel createShopSlot(StoreItem it) {
         JPanel slot = new JPanel(new BorderLayout(0, 8)) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
 
-                // cream tile
                 g2.setColor(Theme.BG_SHOP_SLOT);
                 g2.fillRect(0, 0, getWidth(), getHeight());
 
-                // ink border
                 g2.setColor(Theme.BG_INPUT_BORDER);
                 g2.setStroke(new BasicStroke(2));
                 g2.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
@@ -194,7 +200,6 @@ public class ShopDialog extends JDialog {
         slot.setOpaque(false);
         slot.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // Icon panel (slightly darker cream inset)
         JPanel iconBox = new JPanel(new GridBagLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -213,24 +218,24 @@ public class ShopDialog extends JDialog {
         iconBox.setOpaque(false);
         iconBox.setPreferredSize(new Dimension(120, 62));
 
-        JLabel iconLabel = new JLabel(icon);
-        iconLabel.setFont(Theme.emojiFont(30));         // <-- consistent icon scale
+        JLabel iconLabel = new JLabel(it.glyph == null ? "?" : it.glyph);
+        iconLabel.setFont(Theme.emojiFont(30));
         iconLabel.setForeground(Theme.TEXT_PRIMARY);
         iconBox.add(iconLabel);
 
         JButton buy = makePriceButton();
 
-        if (stats.ownsAccessory(itemId)) {
+        if (stats.ownsAccessory(it.id)) {
             buy.setText("OWNED");
             buy.setBackground(Theme.BG_SHOP_OWNED);
             buy.setEnabled(false);
         } else {
-            buy.setText(String.valueOf(price));
+            buy.setText(String.valueOf(it.price));
             buy.setBackground(Theme.BTN_DEFAULT);
             buy.addActionListener(e -> {
-                if (stats.getCoins() >= price) {
-                    stats.addCoins(-price);
-                    stats.addAccessory(itemId);
+                if (stats.getCoins() >= it.price) {
+                    stats.addCoins(-it.price);
+                    stats.addAccessory(it.id);
                     SaveManager.save(stats);
 
                     buy.setText("OWNED");
@@ -253,6 +258,47 @@ public class ShopDialog extends JDialog {
         return slot;
     }
 
+    private JButton themedButton(String text, Color bg, Runnable action) {
+        JButton btn = new JButton(text) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+                Color fill = getBackground();
+                if (!isEnabled()) fill = Theme.BTN_DISABLED;
+                else if (getModel().isPressed()) fill = Theme.BTN_PRESSED;
+                else if (getModel().isRollover()) fill = Theme.BTN_HOVER;
+
+                g2.setColor(fill);
+                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1,
+                        Theme.BUTTON_CORNER_RADIUS, Theme.BUTTON_CORNER_RADIUS);
+
+                g2.setColor(Theme.BG_INPUT_BORDER);
+                g2.setStroke(new BasicStroke(2));
+                g2.drawRoundRect(0, 0, getWidth()-2, getHeight()-2,
+                        Theme.BUTTON_CORNER_RADIUS, Theme.BUTTON_CORNER_RADIUS);
+
+                g2.setColor(Theme.TEXT_PRIMARY);
+                g2.setFont(Theme.font(Theme.FONT_SIZE_BUTTON));
+                FontMetrics fm = g2.getFontMetrics();
+                g2.drawString(getText(),
+                        (getWidth()-fm.stringWidth(getText()))/2,
+                        (getHeight()+fm.getAscent()-fm.getDescent())/2);
+
+                g2.dispose();
+            }
+        };
+        btn.setBackground(bg);
+        btn.setBorderPainted(false);
+        btn.setContentAreaFilled(false);
+        btn.setFocusPainted(false);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setPreferredSize(new Dimension(120, 34));
+        if (action != null) btn.addActionListener(e -> action.run());
+        return btn;
+    }
+
     private JButton makePriceButton() {
         JButton btn = new JButton() {
             @Override protected void paintComponent(Graphics g) {
@@ -265,22 +311,19 @@ public class ShopDialog extends JDialog {
                 else if (getModel().isPressed()) bg = Theme.BTN_PRESSED;
                 else if (getModel().isRollover()) bg = Theme.BTN_HOVER;
 
-                // flat cream bar
                 g2.setColor(bg);
                 g2.fillRect(0, 0, getWidth(), getHeight());
 
-                // ink border
                 g2.setColor(Theme.BG_INPUT_BORDER);
                 g2.setStroke(new BasicStroke(2));
-                g2.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
+                g2.drawRect(0, 0, getWidth()-1, getHeight()-1);
 
-                // text (keep your font)
                 g2.setColor(isEnabled() ? Theme.TEXT_PRIMARY : Theme.TEXT_DISABLED);
                 g2.setFont(Theme.font(Theme.FONT_SIZE_BUTTON));
                 FontMetrics fm = g2.getFontMetrics();
                 String t = getText();
-                int x = (getWidth() - fm.stringWidth(t)) / 2;
-                int y = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
+                int x = (getWidth()-fm.stringWidth(t))/2;
+                int y = (getHeight()+fm.getAscent()-fm.getDescent())/2;
                 g2.drawString(t, x, y);
 
                 g2.dispose();

@@ -4,7 +4,7 @@ public class TrayNotifier {
 
     // Default icon path used by ensureInitialized() if you don't pass one.
     // Change this once to wherever your tray icon actually is.
-    public static String DEFAULT_ICON_PATH = "icon.png";
+    public static String DEFAULT_ICON_PATH = "images/yarn_icon.png";
 
     private static TrayIcon trayIcon;
     private static boolean initialized = false;
