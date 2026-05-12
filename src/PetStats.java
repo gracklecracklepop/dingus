@@ -38,6 +38,7 @@ public class PetStats {
 
     public void setHatScaleNormal(double v) { hatScaleNormal = v; }
     public void setHatScaleBed(double v)    { hatScaleBed = v; }
+    public void setHatScaleDrag(double v)    { hatScaleDrag = v; }
 
     // ── Hat placement anchors (saved, 0..1 fractions) ───────────────
     private double headNormalXFrac = 0.20;

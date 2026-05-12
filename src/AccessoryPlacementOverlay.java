@@ -1,26 +1,19 @@
-import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyEvent;
-import java.awt.event.MouseMotionAdapter;
-import java.awt.image.BufferedImage;
-import java.io.File;
 
 public class AccessoryPlacementOverlay extends JDialog {
 
     public enum Pose { SITTING, BED, DRAG }
 
-    // Must match PetPanel layout
-    private static final int BASE_Y = 80;
-    private static final int DRAG_EXTRA_Y = 100;
-
-    private final Window targetPetWindow;
     private final String glyph;
     private final Color fill;
     private final Color outline;
     private final Pose pose;
+    private final int glyphSizePx;
 
-    private final BufferedImage poseSprite;
+    // Provided by PetPanel (window coords)
+    private final Rectangle spriteBox;
 
     private Point hover = null;   // overlay coords
     private Point pinned = null;  // overlay coords
@@ -28,31 +21,33 @@ public class AccessoryPlacementOverlay extends JDialog {
     private Double outXFrac = null;
     private Double outYFrac = null;
 
-    private final JButton confirmBtn = new JButton("Confirm");
-    private final JButton cancelBtn  = new JButton("Cancel");
+    private final JButton confirmBtn = makeMenuStyleButton("Confirm");
+    private final JButton cancelBtn  = makeMenuStyleButton("Cancel");
 
-    private AccessoryPlacementOverlay(Window ownerDialog,
-                                      Window targetPetWindow,
-                                      String spriteColor,
-                                      String glyph,
-                                      Color fill,
-                                      Color outline,
-                                      Pose pose) {
+    private AccessoryPlacementOverlay(
+            Window ownerDialog,
+            Window targetPetWindow,
+            String glyph,
+            Color fill,
+            Color outline,
+            Pose pose,
+            int glyphSizePx,
+            Rectangle spriteBox
+    ) {
         super(ownerDialog);
-        this.targetPetWindow = targetPetWindow;
         this.glyph = glyph;
         this.fill = fill;
         this.outline = outline;
         this.pose = pose;
-
-        this.poseSprite = loadPoseSprite(spriteColor, pose);
+        this.glyphSizePx = glyphSizePx;
+        this.spriteBox = spriteBox;
 
         setUndecorated(true);
         setModal(true);
         setAlwaysOnTop(true);
         setBackground(new Color(0, 0, 0, 0));
 
-        // Overlay exactly over the PET window
+        // Overlay exactly over the PET window bounds
         setBounds(targetPetWindow.getBounds());
 
         JPanel root = new JPanel(null) {
@@ -62,8 +57,8 @@ public class AccessoryPlacementOverlay extends JDialog {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-                // instruction card (no blackout)
-                int boxW = Math.min(520, getWidth() - 16);
+                // instruction card
+                int boxW = Math.min(560, getWidth() - 16);
                 int boxH = 64;
                 int boxX = 8;
                 int boxY = 8;
@@ -77,29 +72,23 @@ public class AccessoryPlacementOverlay extends JDialog {
 
                 g2.setColor(Theme.TEXT_PRIMARY);
                 g2.setFont(Theme.font(Theme.FONT_SIZE_BODY));
-                g2.drawString("Place hat (" + pose.name().toLowerCase() + "): click to pin, then Confirm.", boxX + 12, boxY + 28);
+                g2.drawString("Place hat (" + pose.name().toLowerCase() + "): click to pin, then Confirm.",
+                        boxX + 12, boxY + 28);
 
                 g2.setFont(Theme.font(Theme.FONT_SIZE_SMALL));
-                g2.drawString("ESC cancels. Position saves to stats.", boxX + 12, boxY + 48);
+                g2.drawString("ESC cancels. Click directly on the sprite.",
+                        boxX + 12, boxY + 48);
 
-                // sprite box (fractions measured inside this)
-                Rectangle spriteBox = getSpriteBox();
-
-                // draw the POSE sprite so placement matches dropdown selection
-                if (poseSprite != null) {
-                    drawContain(g2, poseSprite, spriteBox);
-                }
-
-                // outline sprite box
+                // outline spriteBox (so you can see the saved coordinate area)
                 g2.setColor(new Color(Theme.BG_INPUT_BORDER.getRed(), Theme.BG_INPUT_BORDER.getGreen(), Theme.BG_INPUT_BORDER.getBlue(), 120));
                 g2.setStroke(new BasicStroke(2));
                 g2.drawRect(spriteBox.x, spriteBox.y, spriteBox.width - 1, spriteBox.height - 1);
 
-                // hat preview (hover or pinned)
+                // hat preview
                 Point p = (pinned != null) ? pinned : hover;
                 if (p != null) {
                     Point clamped = clampPointToRect(p, spriteBox);
-                    drawOutlinedGlyph(g2, glyph, clamped.x, clamped.y, 28, fill, outline);
+                    drawOutlinedGlyph(g2, glyph, clamped.x, clamped.y, glyphSizePx, fill, outline);
                 }
 
                 g2.dispose();
@@ -111,9 +100,6 @@ public class AccessoryPlacementOverlay extends JDialog {
         confirmBtn.setVisible(false);
         cancelBtn.setVisible(false);
 
-        styleBtn(confirmBtn);
-        styleBtn(cancelBtn);
-
         confirmBtn.setSize(110, 32);
         cancelBtn.setSize(110, 32);
         confirmBtn.setLocation(8, 8 + 64 + 8);
@@ -122,7 +108,7 @@ public class AccessoryPlacementOverlay extends JDialog {
         root.add(confirmBtn);
         root.add(cancelBtn);
 
-        root.addMouseMotionListener(new MouseMotionAdapter() {
+        root.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
             @Override public void mouseMoved(java.awt.event.MouseEvent e) {
                 hover = e.getPoint();
                 root.repaint();
@@ -142,7 +128,6 @@ public class AccessoryPlacementOverlay extends JDialog {
         });
 
         confirmBtn.addActionListener(e -> {
-            Rectangle spriteBox = getSpriteBox();
             Point clamped = clampPointToRect(pinned, spriteBox);
 
             outXFrac = (clamped.x - spriteBox.x) / (double) spriteBox.width;
@@ -169,25 +154,60 @@ public class AccessoryPlacementOverlay extends JDialog {
         });
     }
 
-    private void styleBtn(JButton b) {
-        b.setBorderPainted(false);
-        b.setContentAreaFilled(false);
-        b.setFocusPainted(false);
-        b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        b.setFont(Theme.font(Theme.FONT_SIZE_BUTTON));
-        b.setForeground(Theme.TEXT_PRIMARY);
-        b.setBackground(Theme.BTN_DEFAULT);
-    }
+    private JButton makeMenuStyleButton(String text) {
+        int btnHeight = 22;
+        int totalHeight = 32;
 
-    private Rectangle getSpriteBox() {
-        int y = BASE_Y;
-        if (pose == Pose.DRAG) y += DRAG_EXTRA_Y;
-        return new Rectangle(0, y, getWidth(), BedDialog.BED_HEIGHT);
+        JButton btn = new JButton(text) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+                Color bg = getBackground();
+                if (!isEnabled())                 bg = Theme.BTN_DISABLED;
+                else if (getModel().isPressed())  bg = Theme.BTN_PRESSED;
+                else if (getModel().isRollover()) bg = Theme.BTN_HOVER;
+
+                g2.setColor(bg);
+                g2.fillRoundRect(0, 0, getWidth(), btnHeight,
+                        Theme.BUTTON_CORNER_RADIUS, Theme.BUTTON_CORNER_RADIUS + 1);
+
+                g2.setColor(Theme.BTN_ACCENT);
+                g2.drawRoundRect(0, 0, getWidth() - 1, btnHeight - 1,
+                        Theme.BUTTON_CORNER_RADIUS, Theme.BUTTON_CORNER_RADIUS + 1);
+
+                g2.setColor(isEnabled() ? Theme.TEXT_PRIMARY : Theme.TEXT_DISABLED);
+
+                int textWidth = Theme.mixedStringWidth(g2, getText(), Theme.FONT_SIZE_BUTTON);
+                g2.setFont(Theme.font(Theme.FONT_SIZE_BUTTON));
+                FontMetrics fm = g2.getFontMetrics();
+
+                int x = (getWidth() - textWidth) / 2;
+                int y = (btnHeight + fm.getAscent() - fm.getDescent()) / 2;
+
+                Theme.drawMixedString(g2, getText(), x, y, Theme.FONT_SIZE_BUTTON);
+
+                g2.dispose();
+            }
+        };
+
+        btn.setBackground(Theme.BTN_DEFAULT);
+        btn.setForeground(Theme.TEXT_PRIMARY);
+        btn.setPreferredSize(new Dimension(110, totalHeight));
+        btn.setBorderPainted(false);
+        btn.setContentAreaFilled(false);
+        btn.setFocusPainted(false);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setRolloverEnabled(true);
+        return btn;
     }
 
     private static Point clampPointToRect(Point p, Rectangle r) {
-        int x = Math.max(r.x, Math.min(r.x + r.width, p.x));
-        int y = Math.max(r.y, Math.min(r.y + r.height, p.y));
+        int maxX = r.x + r.width - 1;
+        int maxY = r.y + r.height - 1;
+        int x = Math.max(r.x, Math.min(maxX, p.x));
+        int y = Math.max(r.y, Math.min(maxY, p.y));
         return new Point(x, y);
     }
 
@@ -214,57 +234,20 @@ public class AccessoryPlacementOverlay extends JDialog {
         g2.drawString(glyph, x, y);
     }
 
-    private static void drawContain(Graphics2D g2, BufferedImage img, Rectangle box) {
-        double sx = box.width  / (double) img.getWidth();
-        double sy = box.height / (double) img.getHeight();
-        double s = Math.min(sx, sy);
-
-        int dw = (int) Math.round(img.getWidth() * s);
-        int dh = (int) Math.round(img.getHeight() * s);
-
-        int dx = box.x + (box.width - dw) / 2;
-        int dy = box.y + (box.height - dh) / 2;
-
-        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-        g2.drawImage(img, dx, dy, dw, dh, null);
-    }
-
-    private static BufferedImage loadPoseSprite(String spriteColor, Pose pose) {
-        if (spriteColor == null) spriteColor = "Default (Orange)";
-        String path;
-
-        switch (spriteColor) {
-            case "Void (Black)" -> path = switch (pose) {
-                case SITTING -> "dingus - Copy/blacksitting.png";
-                case BED     -> "dingus - Copy/blackinbed.png";
-                case DRAG    -> "dingus - Copy/blackscruff.png";
-            };
-            case "Ghost (White)" -> path = switch (pose) {
-                case SITTING -> "dingus - Copy/whitesitting.png";
-                case BED     -> "dingus - Copy/whiteinbed.png";
-                case DRAG    -> "dingus - Copy/whitescruff.png";
-            };
-            default -> path = switch (pose) {
-                case SITTING -> "dingus - Copy/orangesitting.png";
-                case BED     -> "dingus - Copy/orangeinbed.png";
-                case DRAG    -> "dingus - Copy/orangescruff.png";
-            };
-        }
-
-        try { return ImageIO.read(new File(path)); }
-        catch (Exception e) { return null; }
-    }
-
     /** Returns {xFrac, yFrac} or null if cancelled. */
-    public static double[] pick(Window ownerDialog,
-                                Window targetPetWindow,
-                                String spriteColor,
-                                String glyph,
-                                Color fill,
-                                Color outline,
-                                Pose pose) {
-        AccessoryPlacementOverlay o =
-                new AccessoryPlacementOverlay(ownerDialog, targetPetWindow, spriteColor, glyph, fill, outline, pose);
+    public static double[] pickOnPetWindow(
+            Window ownerDialog,
+            Window targetPetWindow,
+            String glyph,
+            Color fill,
+            Color outline,
+            Pose pose,
+            int glyphSizePx,
+            Rectangle spriteBoxInWindowCoords
+    ) {
+        AccessoryPlacementOverlay o = new AccessoryPlacementOverlay(
+                ownerDialog, targetPetWindow, glyph, fill, outline, pose, glyphSizePx, spriteBoxInWindowCoords
+        );
         o.setVisible(true);
         if (o.outXFrac == null || o.outYFrac == null) return null;
         return new double[]{ o.outXFrac, o.outYFrac };

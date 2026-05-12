@@ -14,16 +14,10 @@ public class PetPanel extends JPanel {
     private static final int BASE_Y = 80;
     private static final int DRAG_EXTRA_Y = 100;
 
+    private static final int HAT_BASE_SIZE = 26; // base hat size at 100%
+
     private final PetStats stats;
-    // CODE-ONLY anchors (not saved)
-    private static final double HEAD_NORMAL_XFRAC = 0.29;
-    private static final double HEAD_NORMAL_YFRAC = 0.139;
 
-    private static final double HEAD_BED_XFRAC    = 0.67; // use 0..1 (avoid negatives)
-    private static final double HEAD_BED_YFRAC    = 0.110;
-
-    private static final double HEAD_DRAG_XFRAC   = 0.52;
-    private static final double HEAD_DRAG_YFRAC   = 0.1199;
     private BufferedImage normalImage;
     private BufferedImage dragImage;
     private BufferedImage bedImage;
@@ -48,6 +42,13 @@ public class PetPanel extends JPanel {
     // last drawn sprite rect (panel coords)
     private Rectangle lastDrawRect = new Rectangle(0, BASE_Y, 1, 1);
 
+    // IMPORTANT: hat placement uses fractions of spriteBox (matches overlay)
+    private Rectangle lastSpriteBox = new Rectangle(0, BASE_Y, 1, 1);
+
+    // ── Hat placement preview (NO state changes like resizing) ────────────────
+    private boolean hatPlacementPreviewActive = false;
+    private AccessoryPlacementOverlay.Pose previewPose = AccessoryPlacementOverlay.Pose.SITTING;
+
     public PetPanel(JDialog dialog) {
         this.dialog = dialog;
         setLayout(null);
@@ -61,6 +62,35 @@ public class PetPanel extends JPanel {
         menuToggleButton = buildToggleButton();
         menuToggleButton.setBounds(5, 85, BUTTON_SIZE, BUTTON_SIZE);
         add(menuToggleButton);
+    }
+
+    /** Temporarily show the pose sprite used by the hat placement dropdown. */
+    public void beginHatPlacementPreview(AccessoryPlacementOverlay.Pose pose) {
+        hatPlacementPreviewActive = true;
+        previewPose = (pose != null) ? pose : AccessoryPlacementOverlay.Pose.SITTING;
+        repaint();
+    }
+
+    /** Restore normal rendering after placement overlay closes. */
+    public void endHatPlacementPreview() {
+        hatPlacementPreviewActive = false;
+        repaint();
+    }
+
+    /**
+     * Returns the exact spriteBox used for hat placement fractions, in WINDOW coordinates,
+     * so it stays correct even if the menu is open (pet panel is shifted).
+     */
+    public Rectangle getSpriteBoxInWindowCoords(AccessoryPlacementOverlay.Pose pose) {
+        int y = BASE_Y + ((pose == AccessoryPlacementOverlay.Pose.DRAG) ? DRAG_EXTRA_Y : 0);
+
+        // spriteBox in *panel* coords:
+        Rectangle rPanel = new Rectangle(0, y, getWidth(), BedDialog.BED_HEIGHT);
+
+        // convert to *window* coords (same coords the overlay uses)
+        Window w = SwingUtilities.getWindowAncestor(this);
+        if (w == null) return rPanel;
+        return SwingUtilities.convertRectangle(this, rPanel, w);
     }
 
     public void setBedDialog(BedDialog bed) {
@@ -160,7 +190,6 @@ public class PetPanel extends JPanel {
                 preDragHeight = -1;
             }
 
-            // grass mini-game updates ONLY on release if intersecting
             try { menu.checkGrassDrop(dialog.getBounds()); } catch (Throwable ignored) {}
 
             if (isNearBed()) {
@@ -274,7 +303,9 @@ public class PetPanel extends JPanel {
         btn.setOpaque(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btn.addActionListener(e -> toggleMenu());
-        btn.addMouseListener(new MouseAdapter() { @Override public void mousePressed(java.awt.event.MouseEvent e) { e.consume(); }});
+        btn.addMouseListener(new MouseAdapter() {
+            @Override public void mousePressed(java.awt.event.MouseEvent e) { e.consume(); }
+        });
         return btn;
     }
 
@@ -311,30 +342,62 @@ public class PetPanel extends JPanel {
         g2.drawImage(img, r.x, r.y, r.width, r.height, null);
     }
 
+    private static double clamp(double v, double lo, double hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+    private static double clamp01(double v) {
+        return clamp(v, 0.0, 1.0);
+    }
+
+    private static int clampInt(int v, int lo, int hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+    private BufferedImage imageForPose(AccessoryPlacementOverlay.Pose pose) {
+        return switch (pose) {
+            case SITTING -> normalImage;
+            case BED     -> bedImage;
+            case DRAG    -> dragImage;
+        };
+    }
+
     private void drawHat(Graphics2D g2) {
         StoreItem it = AccessoryCatalog.byId(stats.getEquippedHatId());
         if (it == null || it.glyph == null) return;
 
-        // pick correct anchor based on state
+        // Per-sprite anchors (customizable independently)
         double xf, yf;
         if (isDragging) {
-            xf = HEAD_DRAG_XFRAC;
-            yf = HEAD_DRAG_YFRAC;
+            xf = stats.getHeadDragXFrac();
+            yf = stats.getHeadDragYFrac();
         } else if (isInBed) {
-            xf = HEAD_BED_XFRAC;
-            yf = HEAD_BED_YFRAC;
+            xf = stats.getHeadBedXFrac();
+            yf = stats.getHeadBedYFrac();
         } else {
-            xf = HEAD_NORMAL_XFRAC;
-            yf = HEAD_NORMAL_YFRAC;
+            xf = stats.getHeadNormalXFrac();
+            yf = stats.getHeadNormalYFrac();
         }
 
-        int cx = (int) Math.round(lastDrawRect.x + lastDrawRect.width  * xf);
-        int cy = (int) Math.round(lastDrawRect.y + lastDrawRect.height * yf);
+        xf = clamp01(xf);
+        yf = clamp01(yf);
+
+        // Consistent size across all poses:
+        double scale = clamp(stats.getHatScaleNormal(), 0.50, 2.00);
+
+        int cx = (int) Math.round(lastSpriteBox.x + lastSpriteBox.width  * xf);
+        int cy = (int) Math.round(lastSpriteBox.y + lastSpriteBox.height * yf);
+
+        cx = clampInt(cx, lastSpriteBox.x, lastSpriteBox.x + lastSpriteBox.width - 1);
+        cy = clampInt(cy, lastSpriteBox.y, lastSpriteBox.y + lastSpriteBox.height - 1);
+
+        int sizePx = (int) Math.round(HAT_BASE_SIZE * scale);
+        sizePx = clampInt(sizePx, 12, 72);
 
         Color fill = new Color(stats.getHatColorRGB(), true);
         Color outline = Theme.BG_INPUT_BORDER;
 
-        drawOutlinedGlyph(g2, it.glyph, cx, cy, 26, fill, outline);
+        drawOutlinedGlyph(g2, it.glyph, cx, cy, sizePx, fill, outline);
     }
 
     private void drawOutlinedGlyph(Graphics2D g2, String glyph, int cx, int cy, int size,
@@ -367,24 +430,42 @@ public class PetPanel extends JPanel {
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
+        // Decide which pose is being rendered
+        AccessoryPlacementOverlay.Pose pose;
+        if (hatPlacementPreviewActive) {
+            pose = previewPose;
+        } else if (isDragging) {
+            pose = AccessoryPlacementOverlay.Pose.DRAG;
+        } else if (isInBed) {
+            pose = AccessoryPlacementOverlay.Pose.BED;
+        } else {
+            pose = AccessoryPlacementOverlay.Pose.SITTING;
+        }
+
+        BufferedImage img = hatPlacementPreviewActive ? imageForPose(pose) : currentImage;
+
         Rectangle spriteBox = new Rectangle(
                 0,
-                BASE_Y + (isDragging ? DRAG_EXTRA_Y : 0),
+                BASE_Y + ((pose == AccessoryPlacementOverlay.Pose.DRAG) ? DRAG_EXTRA_Y : 0),
                 getWidth(),
                 BedDialog.BED_HEIGHT
         );
+        lastSpriteBox = spriteBox;
 
         recomputeBaseScaleIfNeeded(spriteBox);
 
-        double clamp = maxScaleToFit(currentImage, spriteBox);
+        double clamp = maxScaleToFit(img, spriteBox);
         double s = (baseScale > 0) ? Math.min(baseScale, clamp) : clamp;
 
-        lastDrawRect = computeDrawRectBottomAligned(currentImage, spriteBox, s);
+        lastDrawRect = computeDrawRectBottomAligned(img, spriteBox, s);
 
-        drawWithScaleBottomAligned(g2, currentImage, spriteBox, s);
+        drawWithScaleBottomAligned(g2, img, spriteBox, s);
 
-        // draw hat on top of sprite (no UI button, just the emoji)
-        drawHat(g2);
+        // During placement preview, the overlay draws the moving hat preview,
+        // so don't draw the normal hat (avoids “double hats”).
+        if (!hatPlacementPreviewActive) {
+            drawHat(g2);
+        }
 
         g2.dispose();
     }

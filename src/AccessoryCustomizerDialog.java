@@ -1,29 +1,67 @@
 import javax.swing.*;
+import javax.swing.plaf.basic.BasicSliderUI;
 import java.awt.*;
+import java.awt.TrayIcon;
+import java.awt.event.KeyEvent;
 import java.util.List;
 
 public class AccessoryCustomizerDialog extends JDialog {
 
     private final PetStats stats;
     private final Runnable onChanged;
-    private final Window petWindow; // the actual Dingus window we overlay
+    private final Window petWindow; // Dingus window (overlay target)
 
-    private static final Color[] PALETTE = {
-            new Color(0x1F1B16), new Color(0xC78B2E), new Color(0xE07A5F), new Color(0x7AB9C5),
-            new Color(0x9FD39A), new Color(0xF2D074), new Color(0x6B5CA5), new Color(0xFFFFFF)
+    private final JComboBox<AccessoryPlacementOverlay.Pose> poseBox =
+            new JComboBox<>(AccessoryPlacementOverlay.Pose.values());
+
+    private final JLabel sizeLabel = new JLabel("Size: 100%");
+    private final JSlider sizeSlider = new JSlider(50, 200, 100);
+
+    private final JSlider rSlider = new JSlider(0, 255, 31);
+    private final JSlider gSlider = new JSlider(0, 255, 27);
+    private final JSlider bSlider = new JSlider(0, 255, 22);
+
+    // RGB changes are staged (applied only when dialog closes)
+    private final int initialHatColorRGB;
+    private int pendingHatColorRGB;
+    private boolean pendingColorDirty = false;
+
+    private final JPanel colorPreview = new JPanel() {
+        @Override protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            Color c = new Color(rSlider.getValue(), gSlider.getValue(), bSlider.getValue());
+            g2.setColor(c);
+            g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+
+            g2.setColor(Theme.BG_INPUT_BORDER);
+            g2.setStroke(new BasicStroke(2));
+            g2.drawRoundRect(0, 0, getWidth() - 2, getHeight() - 2, 10, 10);
+
+            g2.dispose();
+        }
     };
+
+    private final JLabel hexLabel = new JLabel("", SwingConstants.RIGHT);
 
     public AccessoryCustomizerDialog(Window ownerDialog, Window petWindow, PetStats stats, Runnable onChanged) {
         super(ownerDialog);
+        TrayNotifier.ensureInitialized();
+
         this.stats = stats;
         this.onChanged = onChanged;
         this.petWindow = petWindow;
+
+        this.initialHatColorRGB = stats.getHatColorRGB();
+        this.pendingHatColorRGB = initialHatColorRGB;
 
         setModal(true);
         setUndecorated(true);
         setType(Type.UTILITY);
         setBackground(new Color(0,0,0,0));
-        setSize(560, 380);
+        setSize(620, 420);
         setLocationRelativeTo(ownerDialog);
 
         JPanel root = new JPanel(new BorderLayout()) {
@@ -38,6 +76,40 @@ public class AccessoryCustomizerDialog extends JDialog {
 
         root.add(buildContent(), BorderLayout.CENTER);
         setContentPane(root);
+
+        // Make sliders match theme (size slider same style as RGB sliders)
+        styleSlider(sizeSlider, Theme.BTN_DEFAULT);
+        styleSlider(rSlider, Theme.BTN_DEFAULT);
+        styleSlider(gSlider, Theme.BTN_DEFAULT);
+        styleSlider(bSlider, Theme.BTN_DEFAULT);
+
+        initRgbFromStats();
+        initSizeFromStats();
+        hookEvents();
+        refreshHex();
+
+        // ESC closes (and commits staged RGB)
+        root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "esc");
+        root.getActionMap().put("esc", new AbstractAction() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) {
+                dispose();
+            }
+        });
+    }
+
+    @Override public void dispose() {
+        commitPendingColorIfNeeded();
+        super.dispose();
+    }
+
+    private void commitPendingColorIfNeeded() {
+        if (!pendingColorDirty) return;
+        if (pendingHatColorRGB == stats.getHatColorRGB()) return;
+
+        stats.setHatColorRGB(pendingHatColorRGB);
+        SaveManager.save(stats);
+        changed(); // repaint pet ONCE, at close
     }
 
     private JComponent buildContent() {
@@ -50,9 +122,9 @@ public class AccessoryCustomizerDialog extends JDialog {
         right.setOpaque(false);
         right.setLayout(new BoxLayout(right, BoxLayout.Y_AXIS));
 
-        right.add(buildSpawnPositionPanel());
-        right.add(Box.createVerticalStrut(10));
-        right.add(buildRgbColorPanel());
+        right.add(buildPlacementRow());
+        right.add(Box.createVerticalStrut(12));
+        right.add(buildRgbPanel());
         right.add(Box.createVerticalGlue());
         right.add(buildFooter());
 
@@ -61,115 +133,138 @@ public class AccessoryCustomizerDialog extends JDialog {
     }
 
     private JComponent buildHatList() {
-        JPanel left = new JPanel();
-        left.setOpaque(false);
-        left.setPreferredSize(new Dimension(200, 10));
-        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
+        JPanel list = new JPanel();
+        list.setOpaque(false);
+        list.setPreferredSize(new Dimension(220, 10));
+        list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
 
         JLabel title = new JLabel("Hats (owned)");
         title.setForeground(Theme.TEXT_PRIMARY);
         title.setFont(Theme.font(Theme.FONT_SIZE_LABEL));
-        left.add(title);
-        left.add(Box.createVerticalStrut(8));
+        list.add(title);
+        list.add(Box.createVerticalStrut(8));
 
-        left.add(themedButton("None", Theme.BTN_DEFAULT, () -> {
+        list.add(themedButton("None", Theme.BTN_DEFAULT, () -> {
             stats.setEquippedHatId(null);
             SaveManager.save(stats);
             changed();
         }));
-        left.add(Box.createVerticalStrut(6));
+        list.add(Box.createVerticalStrut(6));
 
         List<StoreItem> hats = AccessoryCatalog.ownedHats(stats);
         for (StoreItem it : hats) {
-            left.add(themedButton(it.glyph + "  " + it.name, Theme.BTN_DEFAULT, () -> {
+            list.add(themedButton(it.glyph + "  " + it.name, Theme.BTN_DEFAULT, () -> {
                 stats.setEquippedHatId(it.id);
                 SaveManager.save(stats);
                 changed();
             }));
-            left.add(Box.createVerticalStrut(6));
+            list.add(Box.createVerticalStrut(6));
         }
 
-        JScrollPane scroll = new JScrollPane(left);
+        JScrollPane scroll = new JScrollPane(list);
         scroll.setOpaque(false);
         scroll.getViewport().setOpaque(false);
         scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.getVerticalScrollBar().setPreferredSize(new Dimension(Theme.SCROLLBAR_WIDTH, 0));
-
         return scroll;
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // THIS is where your buildSpawnPositionPanel goes (inside this class)
-    // ─────────────────────────────────────────────────────────────
+    private JComponent buildPlacementRow() {
+        JPanel row = new JPanel(new GridBagLayout());
+        row.setOpaque(false);
 
-    private JPanel buildSpawnPositionPanel() {
-        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        p.setOpaque(false);
+        GridBagConstraints c = new GridBagConstraints();
+        c.gridy = 0;
+        c.insets = new Insets(0, 0, 0, 10);
+        c.anchor = GridBagConstraints.WEST;
 
-        JComboBox<AccessoryPlacementOverlay.Pose> poseBox =
-                new JComboBox<>(AccessoryPlacementOverlay.Pose.values());
+        JLabel poseLbl = new JLabel("Pose:");
+        poseLbl.setForeground(Theme.TEXT_PRIMARY);
+        poseLbl.setFont(Theme.font(Theme.FONT_SIZE_LABEL));
+
         poseBox.setFont(Theme.font(Theme.FONT_SIZE_BODY));
         poseBox.setBackground(Theme.BG_INPUT);
         poseBox.setForeground(Theme.TEXT_PRIMARY);
         poseBox.setBorder(BorderFactory.createLineBorder(Theme.BG_INPUT_BORDER, 2));
 
-        JLabel sizeLabel = new JLabel("Size: 100%");
         sizeLabel.setForeground(Theme.TEXT_PRIMARY);
         sizeLabel.setFont(Theme.font(Theme.FONT_SIZE_LABEL));
 
-        JSlider sizeSlider = new JSlider(50, 200, 100); // 50%..200%
         sizeSlider.setOpaque(false);
         sizeSlider.setFocusable(false);
+        sizeSlider.setPreferredSize(new Dimension(260, 28));
 
-// when pose changes, load its saved size into slider
-        poseBox.addActionListener(e -> {
-            var pose = (AccessoryPlacementOverlay.Pose) poseBox.getSelectedItem();
-            int pct = (int) Math.round(getScaleForPose(pose) * 100.0);
-            pct = Math.max(50, Math.min(200, pct));
-            sizeSlider.setValue(pct);
-            sizeLabel.setText("Size: " + pct + "%");
-        });
+        // Size column: label on top, slider underneath
+        JPanel sizeCol = new JPanel();
+        sizeCol.setOpaque(false);
+        sizeCol.setLayout(new BoxLayout(sizeCol, BoxLayout.Y_AXIS));
+        sizeCol.add(sizeLabel);
+        sizeCol.add(Box.createVerticalStrut(4));
+        sizeCol.add(sizeSlider);
 
-// when slider changes, save size for current pose
-        sizeSlider.addChangeListener(e -> {
-            var pose = (AccessoryPlacementOverlay.Pose) poseBox.getSelectedItem();
-            int pct = sizeSlider.getValue();
-            sizeLabel.setText("Size: " + pct + "%");
+        JButton setPos = themedButton("Set Hat Position", Theme.BTN_SECONDARY, this::doSetHatPosition);
 
-            double scale = pct / 100.0;
-            setScaleForPose(pose, scale);
+        // Pose
+        c.gridx = 0; c.weightx = 0; c.fill = GridBagConstraints.NONE;
+        row.add(poseLbl, c);
 
-            // save only when user releases (avoids spam)
-            if (!sizeSlider.getValueIsAdjusting()) {
-                SaveManager.save(stats);
-                if (onChanged != null) onChanged.run();
-            }
-        });
+        c.gridx = 1;
+        row.add(poseBox, c);
 
-        JButton setPos = themedButton("Set Hat Position", Theme.BTN_SECONDARY, () -> {
-            StoreItem it = AccessoryCatalog.byId(stats.getEquippedHatId());
-            if (it == null || it.glyph == null) {
-                TrayNotifier.showNotification("Dingus", "Equip a hat first.", TrayIcon.MessageType.INFO);
-                return;
-            }
-            if (petWindow == null) {
-                TrayNotifier.showNotification("Dingus", "Pet window not found.", TrayIcon.MessageType.ERROR);
-                return;
-            }
+        // Size column gets stretch space
+        c.gridx = 2; c.weightx = 1.0; c.fill = GridBagConstraints.HORIZONTAL;
+        row.add(sizeCol, c);
 
-            Color fill = new Color(stats.getHatColorRGB(), true);
-            Color outline = Theme.BG_INPUT_BORDER;
+        // Button on the right
+        c.gridx = 3; c.weightx = 0; c.fill = GridBagConstraints.NONE; c.insets = new Insets(0, 0, 0, 0);
+        row.add(setPos, c);
 
-            var pose = (AccessoryPlacementOverlay.Pose) poseBox.getSelectedItem();
+        return row;
+    }
 
-            double[] res = AccessoryPlacementOverlay.pick(
-                    this,                 // owner dialog
-                    petWindow,            // pet window to overlay
-                    stats.getSpriteColor(),
+    // ... keep the rest of your AccessoryCustomizerDialog as-is,
+// only replace doSetHatPosition() and add the helper findPetPanel(...)
+
+    private void doSetHatPosition() {
+        StoreItem it = AccessoryCatalog.byId(stats.getEquippedHatId());
+        if (it == null || it.glyph == null) {
+            TrayNotifier.showNotification("Dingus", "Equip a hat first.", TrayIcon.MessageType.INFO);
+            return;
+        }
+        if (petWindow == null) {
+            TrayNotifier.showNotification("Dingus", "Pet window not found.", TrayIcon.MessageType.ERROR);
+            return;
+        }
+
+        AccessoryPlacementOverlay.Pose pose = (AccessoryPlacementOverlay.Pose) poseBox.getSelectedItem();
+
+        // Use pending color if you're staging RGB; otherwise use stats.getHatColorRGB()
+        Color fill = new Color(stats.getHatColorRGB(), true);
+        Color outline = Theme.BG_INPUT_BORDER;
+
+        int sizePx = computeHatSizePx(); // your existing method (consistent size)
+
+        PetPanel petPanel = findPetPanel(petWindow);
+        if (petPanel == null) {
+            TrayNotifier.showNotification("Dingus", "PetPanel not found.", TrayIcon.MessageType.ERROR);
+            return;
+        }
+
+        // Switch the *real* sprite to match dropdown pose
+        petPanel.beginHatPlacementPreview(pose);
+
+        Rectangle spriteBox = petPanel.getSpriteBoxInWindowCoords(pose);
+
+        try {
+            double[] res = AccessoryPlacementOverlay.pickOnPetWindow(
+                    this,
+                    petWindow,
                     it.glyph,
                     fill,
                     outline,
-                    pose
+                    pose,
+                    sizePx,
+                    spriteBox
             );
             if (res == null) return;
 
@@ -181,20 +276,37 @@ public class AccessoryCustomizerDialog extends JDialog {
 
             SaveManager.save(stats);
             changed();
-        });
-
-        JLabel lbl = new JLabel("Pose:");
-        lbl.setForeground(Theme.TEXT_PRIMARY);
-        lbl.setFont(Theme.font(Theme.FONT_SIZE_LABEL));
-
-        p.add(lbl);
-        p.add(poseBox);
-        p.add(setPos);
-
-        return p;
+        } finally {
+            // Restore whatever the pet was actually doing
+            petPanel.endHatPlacementPreview();
+        }
     }
 
-    private JComponent buildRgbColorPanel() {
+    private static PetPanel findPetPanel(Window w) {
+        if (w == null) return null;
+
+        if (w instanceof RootPaneContainer rpc) {
+            Container c = rpc.getContentPane();
+            return findPetPanelIn(c);
+        }
+        if (w instanceof Container c) {
+            return findPetPanelIn(c);
+        }
+        return null;
+    }
+
+    private static PetPanel findPetPanelIn(Container c) {
+        for (Component comp : c.getComponents()) {
+            if (comp instanceof PetPanel pp) return pp;
+            if (comp instanceof Container child) {
+                PetPanel found = findPetPanelIn(child);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private JComponent buildRgbPanel() {
         JPanel wrap = new JPanel(new BorderLayout(0, 8));
         wrap.setOpaque(false);
 
@@ -203,91 +315,30 @@ public class AccessoryCustomizerDialog extends JDialog {
         title.setFont(Theme.font(Theme.FONT_SIZE_LABEL));
         wrap.add(title, BorderLayout.NORTH);
 
-        JPanel grid = new JPanel(new GridLayout(3, 1, 0, 8));
-        grid.setOpaque(false);
+        JPanel rows = new JPanel(new GridLayout(3, 1, 0, 10));
+        rows.setOpaque(false);
 
-        // current color from stats (ARGB)
-        Color cur = new Color(stats.getHatColorRGB(), true);
-
-        JSlider r = makeRgbSlider(cur.getRed());
-        JSlider g = makeRgbSlider(cur.getGreen());
-        JSlider b = makeRgbSlider(cur.getBlue());
-
-        JLabel hex = new JLabel("", SwingConstants.RIGHT);
-        hex.setForeground(Theme.TEXT_SECONDARY);
-        hex.setFont(Theme.font(Theme.FONT_SIZE_SMALL));
-
-        JPanel preview = new JPanel() {
-            @Override protected void paintComponent(Graphics g0) {
-                super.paintComponent(g0);
-                Graphics2D g2 = (Graphics2D) g0.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-                Color c = new Color(
-                        r.getValue(),
-                        g.getValue(),
-                        b.getValue()
-                );
-
-                g2.setColor(c);
-                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 10, 10);
-
-                g2.setColor(Theme.BG_INPUT_BORDER);
-                g2.setStroke(new BasicStroke(2));
-                g2.drawRoundRect(0, 0, getWidth()-2, getHeight()-2, 10, 10);
-
-                g2.dispose();
-            }
-        };
-        preview.setOpaque(false);
-        preview.setPreferredSize(new Dimension(80, 18));
-
-        Runnable applyLive = () -> {
-            int rgb = (0xFF << 24)
-                    | (r.getValue() << 16)
-                    | (g.getValue() << 8)
-                    | (b.getValue());
-            stats.setHatColorRGB(rgb);
-
-            hex.setText(String.format("#%02X%02X%02X", r.getValue(), g.getValue(), b.getValue()));
-            preview.repaint();
-
-            // update pet immediately
-            if (onChanged != null) onChanged.run();
-        };
-
-        // Apply live while dragging; only SAVE when the user releases slider
-        r.addChangeListener(e -> {
-            applyLive.run();
-            if (!r.getValueIsAdjusting()) SaveManager.save(stats);
-        });
-        g.addChangeListener(e -> {
-            applyLive.run();
-            if (!g.getValueIsAdjusting()) SaveManager.save(stats);
-        });
-        b.addChangeListener(e -> {
-            applyLive.run();
-            if (!b.getValueIsAdjusting()) SaveManager.save(stats);
-        });
-
-        // initialize text/preview
-        applyLive.run();
-
-        grid.add(rgbRow("Red", r));
-        grid.add(rgbRow("Green", g));
-        grid.add(rgbRow("Blue", b));
+        rows.add(rgbRow("R", rSlider));
+        rows.add(rgbRow("G", gSlider));
+        rows.add(rgbRow("B", bSlider));
 
         JPanel bottom = new JPanel(new BorderLayout(10, 0));
         bottom.setOpaque(false);
-        bottom.add(preview, BorderLayout.WEST);
-        bottom.add(hex, BorderLayout.CENTER);
+        colorPreview.setOpaque(false);
+        colorPreview.setPreferredSize(new Dimension(110, 20));
 
-        wrap.add(grid, BorderLayout.CENTER);
+        hexLabel.setForeground(Theme.TEXT_SECONDARY);
+        hexLabel.setFont(Theme.font(Theme.FONT_SIZE_SMALL));
+
+        bottom.add(colorPreview, BorderLayout.WEST);
+        bottom.add(hexLabel, BorderLayout.CENTER);
+
+        wrap.add(rows, BorderLayout.CENTER);
         wrap.add(bottom, BorderLayout.SOUTH);
         return wrap;
     }
 
-    private JPanel rgbRow(String label, JSlider slider) {
+    private JPanel rgbRow(String label, JSlider s) {
         JPanel row = new JPanel(new BorderLayout(10, 0));
         row.setOpaque(false);
 
@@ -296,57 +347,13 @@ public class AccessoryCustomizerDialog extends JDialog {
         l.setFont(Theme.font(Theme.FONT_SIZE_LABEL));
         l.setPreferredSize(new Dimension(18, 10));
 
-        row.add(l, BorderLayout.WEST);
-        row.add(slider, BorderLayout.CENTER);
-        return row;
-    }
-
-    private JSlider makeRgbSlider(int value) {
-        JSlider s = new JSlider(0, 255, value);
         s.setOpaque(false);
         s.setFocusable(false);
-        return s;
-    }
+        s.setPreferredSize(new Dimension(240, 28));
 
-    private JComponent buildColorRow() {
-        JPanel colors = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        colors.setOpaque(false);
-
-        JLabel lbl = new JLabel("Color:");
-        lbl.setForeground(Theme.TEXT_PRIMARY);
-        lbl.setFont(Theme.font(Theme.FONT_SIZE_LABEL));
-        colors.add(lbl);
-
-        for (Color c : PALETTE) {
-            colors.add(colorDot(c));
-        }
-        return colors;
-    }
-
-    private JComponent colorDot(Color c) {
-        JButton b = new JButton() {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(c);
-                g2.fillOval(0, 0, getWidth()-1, getHeight()-1);
-                g2.setColor(Theme.BG_INPUT_BORDER);
-                g2.setStroke(new BasicStroke(2));
-                g2.drawOval(0, 0, getWidth()-2, getHeight()-2);
-                g2.dispose();
-            }
-        };
-        b.setPreferredSize(new Dimension(18,18));
-        b.setBorderPainted(false);
-        b.setContentAreaFilled(false);
-        b.setFocusPainted(false);
-        b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        b.addActionListener(e -> {
-            stats.setHatColorRGB(c.getRGB());
-            SaveManager.save(stats);
-            changed();
-        });
-        return b;
+        row.add(l, BorderLayout.WEST);
+        row.add(s, BorderLayout.CENTER);
+        return row;
     }
 
     private JComponent buildFooter() {
@@ -359,26 +366,142 @@ public class AccessoryCustomizerDialog extends JDialog {
         return footer;
     }
 
+    private void hookEvents() {
+        poseBox.addActionListener(e -> changed());
+
+        // consistent size across all sprites: set ALL scales together
+        sizeSlider.addChangeListener(e -> {
+            int pct = sizeSlider.getValue();
+            sizeLabel.setText("Size: " + pct + "%");
+
+            double s = clamp(pct / 100.0, 0.50, 2.00);
+            stats.setHatScaleNormal(s);
+            stats.setHatScaleBed(s);
+            stats.setHatScaleDrag(s);
+
+            if (!sizeSlider.getValueIsAdjusting()) {
+                SaveManager.save(stats);
+                changed();
+            } else {
+                changed();
+            }
+        });
+
+        // RGB: update ONLY the dialog preview + staged value (no pet repaint, no save)
+        Runnable rgbStage = () -> {
+            pendingHatColorRGB = (0xFF << 24)
+                    | (rSlider.getValue() << 16)
+                    | (gSlider.getValue() << 8)
+                    | (bSlider.getValue());
+            pendingColorDirty = (pendingHatColorRGB != initialHatColorRGB);
+
+            refreshHex();
+            colorPreview.repaint();
+        };
+
+        rSlider.addChangeListener(e -> rgbStage.run());
+        gSlider.addChangeListener(e -> rgbStage.run());
+        bSlider.addChangeListener(e -> rgbStage.run());
+    }
+
+    private void refreshHex() {
+        hexLabel.setText(String.format("#%02X%02X%02X", rSlider.getValue(), gSlider.getValue(), bSlider.getValue()));
+    }
+
+    private void initRgbFromStats() {
+        Color c = new Color(stats.getHatColorRGB(), true);
+        rSlider.setValue(c.getRed());
+        gSlider.setValue(c.getGreen());
+        bSlider.setValue(c.getBlue());
+    }
+
+    private void initSizeFromStats() {
+        // canonical = normal (and we keep all 3 equal)
+        int pct = (int) Math.round(stats.getHatScaleNormal() * 100.0);
+        pct = clampInt(pct, 50, 200);
+        sizeSlider.setValue(pct);
+        sizeLabel.setText("Size: " + pct + "%");
+    }
+
+    private int computeHatSizePx() {
+        int base = 26; // must match PetPanel base
+        double scale = clamp(stats.getHatScaleNormal(), 0.50, 2.00);
+        int sizePx = (int) Math.round(base * scale);
+        return clampInt(sizePx, 12, 72);
+    }
+
     private void changed() {
         if (onChanged != null) onChanged.run();
-        repaint();
     }
 
-    private double getScaleForPose(AccessoryPlacementOverlay.Pose pose) {
-        return switch (pose) {
-            case SITTING -> stats.getHatScaleNormal();
-            case BED     -> stats.getHatScaleBed();
-            case DRAG    -> stats.getHatScaleDrag();
-        };
+    // ───────────────── Slider theme ─────────────────
+
+    private void styleSlider(JSlider s, Color fillColor) {
+        s.setOpaque(false);
+        s.setFocusable(false);
+        s.setPaintTicks(false);
+        s.setPaintLabels(false);
+        s.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
+
+        s.setUI(new BasicSliderUI(s) {
+            @Override protected Dimension getThumbSize() {
+                return new Dimension(16, 16);
+            }
+
+            @Override public void paintTrack(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                int trackH = 8;
+                int y = trackRect.y + (trackRect.height - trackH) / 2;
+
+                int x1 = trackRect.x;
+                int w  = trackRect.width;
+
+                int thumbCx = thumbRect.x + thumbRect.width / 2;
+                int filledW = Math.max(0, Math.min(w, thumbCx - x1));
+
+                g2.setColor(Theme.BG_INPUT);
+                g2.fillRoundRect(x1, y, w, trackH, 8, 8);
+
+                g2.setColor(fillColor);
+                g2.fillRoundRect(x1, y, filledW, trackH, 8, 8);
+
+                g2.setColor(Theme.BG_INPUT_BORDER);
+                g2.setStroke(new BasicStroke(2f));
+                g2.drawRoundRect(x1, y, w - 1, trackH - 1, 8, 8);
+
+                g2.dispose();
+            }
+
+            @Override public void paintThumb(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                int x = thumbRect.x;
+                int y = thumbRect.y;
+                int w = thumbRect.width;
+                int h = thumbRect.height;
+
+                Color fill = slider.isEnabled() ? Theme.BTN_DEFAULT : Theme.BTN_DISABLED;
+
+                g2.setColor(fill);
+                g2.fillOval(x, y, w - 1, h - 1);
+
+                g2.setColor(Theme.BG_INPUT_BORDER);
+                g2.setStroke(new BasicStroke(2f));
+                g2.drawOval(x, y, w - 1, h - 1);
+
+                g2.dispose();
+            }
+
+            @Override public void paintFocus(Graphics g) {
+                // no focus ring
+            }
+        });
     }
 
-    private void setScaleForPose(AccessoryPlacementOverlay.Pose pose, double scale) {
-        switch (pose) {
-            case SITTING -> stats.setHatScaleNormal(scale);
-            case BED     -> stats.setHatScaleBed(scale);
-            case DRAG    -> stats.setHatScaleDrag(scale);
-        }
-    }
+    // ───────────────── Buttons ─────────────────
 
     private JButton themedButton(String text, Color bg, Runnable action) {
         JButton btn = new JButton(text) {
@@ -419,5 +542,13 @@ public class AccessoryCustomizerDialog extends JDialog {
         btn.setPreferredSize(new Dimension(160, 34));
         if (action != null) btn.addActionListener(e -> action.run());
         return btn;
+    }
+
+    private static int clampInt(int v, int lo, int hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+    private static double clamp(double v, double lo, double hi) {
+        return Math.max(lo, Math.min(hi, v));
     }
 }
