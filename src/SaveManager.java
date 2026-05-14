@@ -39,7 +39,7 @@ public class SaveManager {
         PetStats staty = new PetStats();
         if (!f.exists()) {
             System.out.println("No save file found — starting fresh.");
-            measuring.test();
+//            measuring.test();
             return staty;
         }
         try {

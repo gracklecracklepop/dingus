@@ -1,6 +1,10 @@
 import javax.swing.*;
 import java.awt.*;
+import java.awt.font.TextAttribute;
+import java.awt.image.BufferedImage;
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Theme {
 
@@ -23,29 +27,20 @@ public class Theme {
     public static final Color BTN_SECONDARY  = new Color(0xD2,0xEC,0xF0);       // soft blue
     public static final Color BTN_CLOSE      = new Color(0xFF,0x5F,0x57);       // mac red
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ██████████████████████████  TEXT COLORS  ██████████████████████████████████
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    // TEXT COLORS
     public static final Color TEXT_PRIMARY   = new Color(0x1F,0x1B,0x16);
     public static final Color TEXT_SECONDARY = new Color(0x3A,0x33,0x2C);
     public static final Color TEXT_DISABLED  = new Color(0x88,0x80,0x75);
     public static final Color TEXT_LABEL     = TEXT_PRIMARY;
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ██████████████████████████  ACCENT COLORS  ███████████████████████████████
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    // ACCENT COLORS
     public static final Color ACCENT_COINS   = new Color(0xC7,0x8B,0x2E);
-    public static final Color ACCENT_RAM           = new Color(150, 255, 150);
-    public static final Color ACCENT_CPU           = new Color(150, 200, 255);
-    public static final Color ACCENT_SUCCESS       = new Color(100, 200, 100);
-    public static final Color ACCENT_ERROR         = new Color(255, 100, 100);
+    public static final Color ACCENT_RAM     = new Color(150, 255, 150);
+    public static final Color ACCENT_CPU     = new Color(150, 200, 255);
+    public static final Color ACCENT_SUCCESS = new Color(100, 200, 100);
+    public static final Color ACCENT_ERROR   = new Color(255, 100, 100);
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ██████████████████████████  PROGRESS BARS  ███████████████████████████████
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    // PROGRESS BARS
     public static final Color PROGRESS_TRACK = BG_INPUT;
     public static final Color PROGRESS_HIGH  = new Color(0x9F,0xD3,0x9A);
     public static final Color PROGRESS_MED   = new Color(0xF2,0xD0,0x74);
@@ -53,62 +48,58 @@ public class Theme {
     public static final Color PROGRESS_RAM   = new Color(0xB6,0xE3,0xD0);
     public static final Color PROGRESS_CPU   = new Color(0xB8,0xCF,0xF0);
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ██████████████████████████  SHOP COLORS  █████████████████████████████████
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    // SHOP COLORS
     public static final Color BG_SHOP_SLOT = Theme.BG_MAIN;   // cream
     public static final Color BG_SHOP_BUY  = Theme.BTN_DEFAULT;
     public static final Color BG_SHOP_SLOT_BORDER = Theme.BG_INPUT_BORDER; // ink
     public static final Color BG_SHOP_OWNED        = new Color(100, 150, 100);
     public static final Color BG_SHOP_NO_FUNDS     = new Color(150, 50, 50);
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ██████████████████████████  SCROLLBAR  ███████████████████████████████████
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    // SCROLLBAR
     public static final Color SCROLLBAR_THUMB = new Color(0x1F,0x1B,0x16, 120);
     public static final Color SCROLLBAR_TRACK = new Color(0,0,0,0);
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ██████████████████████████  FONT CONFIG  █████████████████████████████████
-    // ═══════════════════════════════════════════════════════════════════════════
+    // FONT CONFIG
+    public static final String FONT_PATH     = "images/Atop.ttf";
+    public static final String FONT_FALLBACK = "Arial";
+    public static final String EMOJI_FONT    = "Segoe UI Emoji";
 
-    public static final String FONT_PATH           = "images/Atop.ttf";
-    public static final String FONT_FALLBACK       = "Arial";
-    public static final String EMOJI_FONT          = "Segoe UI Emoji";
-
-    public static final int FONT_SIZE_TITLE        = 23;
-    public static final int FONT_SIZE_HEADING      = 18;
-    public static final int FONT_SIZE_BUTTON       = 14;
-    public static final int FONT_SIZE_LABEL        = 13;
-    public static final int FONT_SIZE_BODY         = 14;
-    public static final int FONT_SIZE_SMALL        = 11;
+    public static final int FONT_SIZE_TITLE   = 22;
+    public static final int FONT_SIZE_HEADING = 18;
+    public static final int FONT_SIZE_BUTTON  = 14;
+    public static final int FONT_SIZE_LABEL   = 14;
+    public static final int FONT_SIZE_BODY    = 15;
+    public static final int FONT_SIZE_SMALL   = 11;
 
     public static final int OUTLINE_THICKNESS = 2;
     public static final int TITLEBAR_HEIGHT   = 26;
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ██████████████████████████  SIZING  ██████████████████████████████████████
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    // SIZING
     public static final int CORNER_RADIUS        = 10;
     public static final int BUTTON_CORNER_RADIUS = 8;
 
-    // ─── PetMenu Specific ──────────────────────────────────────────────────────
-    public static final int MENU_WIDTH             = 150;
-    public static final int MENU_SCROLL_HEIGHT     = 230;
-    public static final int SCROLLBAR_WIDTH        = 3;
+    // PetMenu Specific
+    public static final int MENU_WIDTH         = 150;
+    public static final int MENU_SCROLL_HEIGHT = 230;
+    public static final int SCROLLBAR_WIDTH    = 3;
 
-    // ─── SetupWizard Specific ──────────────────────────────────────────────────
-    public static final int WIZARD_WIDTH           = 500;
-    public static final int WIZARD_HEIGHT          = 400;
+    // SetupWizard Specific
+    public static final int WIZARD_WIDTH  = 500;
+    public static final int WIZARD_HEIGHT = 400;
 
-    // ─── Timing ────────────────────────────────────────────────────────────────
-    public static final int SCAN_DURATION_SECONDS  = 15;
+    // Timing
+    public static final int SCAN_DURATION_SECONDS = 15;
+
+    // ─────────────────────────────────────────────────────────────
+    // LETTER SPACING (tracking)
+    //
+    // TRACKING is in "em units" (relative to font size).
+    // 0.04f ≈ subtle spacing (good readability without breaking layout too much).
+    // Increase to 0.06f if you want more air.
+    // ─────────────────────────────────────────────────────────────
+    public static final float LETTER_TRACKING = 0.04f;
 
     public static void paintMacWindow(Graphics2D g2, int w, int h, String title) {
-        // Keep text AA on since you said “keep font for now”
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
@@ -133,18 +124,7 @@ public class Theme {
         drawDot(g2, x + (d+gap), y, d, new Color(0xFE,0xBC,0x2E));
         drawDot(g2, x + 2*(d+gap), y, d, new Color(0x28,0xC8,0x40));
 
-        // centered title
-        JPanel wrapper = new JPanel(new BorderLayout()) {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                Theme.paintMacWindow(g2, getWidth(), getHeight(), "DINGUS");
-                g2.dispose();
-            }
-        };
-        wrapper.setOpaque(false);
-        wrapper.setBorder(BorderFactory.createEmptyBorder(
-                Theme.TITLEBAR_HEIGHT + 10, 12, 12, 12
-        ));
+        // (title is currently not drawn here; your dialogs draw title text elsewhere)
     }
 
     public static String ellipsizeMixed(Graphics2D g2, String s, int maxWidth, int fontSize) {
@@ -154,7 +134,6 @@ public class Theme {
         final String ell = "…";
         String base = s;
 
-        // Remove codepoints from the end until it fits with ellipsis
         while (!base.isEmpty()) {
             int end = base.offsetByCodePoints(base.length(), -1);
             base = base.substring(0, end);
@@ -172,32 +151,56 @@ public class Theme {
         g2.drawOval(x, y, d, d);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ██████████████████████████  FONT LOADER  █████████████████████████████████
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ─────────────────────────────────────────────────────────────
+    // FONT LOADER + CACHE (tracked fonts)
+    // ─────────────────────────────────────────────────────────────
 
-    private static Font cachedFont = null;
+    private static Font cachedBaseFont = null;
+
+    private static final Map<Integer, Font> TEXT_FONT_CACHE  = new HashMap<>();
+    private static final Map<Integer, Font> EMOJI_FONT_CACHE = new HashMap<>();
+
+    private static Font withTracking(Font base) {
+        // Copy attributes and inject tracking
+        Map<java.text.AttributedCharacterIterator.Attribute, Object> attrs =
+                new HashMap<>(base.getAttributes());
+        attrs.put(TextAttribute.TRACKING, LETTER_TRACKING);
+        return base.deriveFont(attrs);
+    }
 
     public static Font font(int size) {
-        if (cachedFont == null) {
+        if (cachedBaseFont == null) {
             try {
-                cachedFont = Font.createFont(Font.TRUETYPE_FONT, new File(FONT_PATH));
-                GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(cachedFont);
+                cachedBaseFont = Font.createFont(Font.TRUETYPE_FONT, new File(FONT_PATH));
+                GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(cachedBaseFont);
             } catch (Exception e) {
-                cachedFont = new Font(FONT_FALLBACK, Font.PLAIN, size);
+                cachedBaseFont = new Font(FONT_FALLBACK, Font.PLAIN, size);
             }
         }
-        return cachedFont.deriveFont(Font.PLAIN, (float) size);
+
+        final int key = Math.max(1, size);
+        return TEXT_FONT_CACHE.computeIfAbsent(key, s -> {
+            Font f = cachedBaseFont.deriveFont(Font.PLAIN, (float) s);
+            return withTracking(f);
+        });
+    }
+
+    public static void applyTextQualityHints(Graphics2D g2) {
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
+        g2.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS,
+                RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING,
+                RenderingHints.VALUE_RENDER_QUALITY);
     }
 
     public static Font emojiFont(int size) {
-        return new Font(EMOJI_FONT, Font.PLAIN, size);
+        final int key = Math.max(1, size);
+        return EMOJI_FONT_CACHE.computeIfAbsent(key,
+                s -> new Font(EMOJI_FONT, Font.PLAIN, s));
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ██████████████████████████  HELPERS  ██████████████████████████████████████
-    // ═══════════════════════════════════════════════════════════════════════════
-
+    // HELPERS
     public static Color progressColor(int value) {
         if (value >= 70) return PROGRESS_HIGH;
         else if (value >= 30) return PROGRESS_MED;
@@ -228,14 +231,14 @@ public class Theme {
         UIManager.put("PopupMenu.border", BorderFactory.createLineBorder(Theme.BG_INPUT_BORDER, 2));
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ██████████████████████████  MIXED TEXT RENDERING  █████████████████████████
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ─────────────────────────────────────────────────────────────
+    // MIXED TEXT RENDERING (uses tracked Theme.font())
+    // ─────────────────────────────────────────────────────────────
 
     public static int drawMixedString(Graphics2D g2, String text, int x, int y, int fontSize) {
         int currentX = x;
-        Font textFont = font(fontSize);
-        Font emojFont = emojiFont(fontSize);
+        Font textFont = font(fontSize);       // tracked
+        Font emojFont = emojiFont(fontSize);  // not tracked
 
         StringBuilder buffer = new StringBuilder();
         boolean currentIsEmoji = false;
@@ -269,8 +272,8 @@ public class Theme {
 
     public static int mixedStringWidth(Graphics2D g2, String text, int fontSize) {
         int totalWidth = 0;
-        Font textFont = font(fontSize);
-        Font emojFont = emojiFont(fontSize);
+        Font textFont = font(fontSize);       // tracked
+        Font emojFont = emojiFont(fontSize);  // not tracked
 
         StringBuilder buffer = new StringBuilder();
         boolean currentIsEmoji = false;
@@ -327,10 +330,11 @@ public class Theme {
         JLabel label = new JLabel(text) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
+                Theme.applyTextQualityHints(g2);
                 g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
                 g2.setColor(getForeground());
 
-                g2.setFont(font(fontSize));
+                g2.setFont(font(fontSize)); // tracked text font
                 FontMetrics fm = g2.getFontMetrics();
                 int y = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
 
@@ -339,21 +343,26 @@ public class Theme {
             }
 
             @Override public Dimension getPreferredSize() {
-                Graphics2D g2 = (Graphics2D) getGraphics();
-                if (g2 == null) return super.getPreferredSize();
-                g2.setFont(font(fontSize));
-                int w = mixedStringWidth(g2, getText(), fontSize);
-                int h = g2.getFontMetrics().getHeight();
-                return new Dimension(w + 4, h + 4);
+                // Reliable (no getGraphics() dependency)
+                BufferedImage img = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D g2 = img.createGraphics();
+                try {
+                    int w = mixedStringWidth(g2, getText(), fontSize);
+                    g2.setFont(font(fontSize));
+                    int h = g2.getFontMetrics().getHeight();
+                    return new Dimension(w + 4, h + 4);
+                } finally {
+                    g2.dispose();
+                }
             }
         };
         label.setForeground(color);
         return label;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // ██████████████████████████  SCREEN HELPERS  ██████████████████████████████
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ─────────────────────────────────────────────────────────────
+    // SCREEN HELPERS
+    // ─────────────────────────────────────────────────────────────
 
     public static GraphicsConfiguration getPrimaryScreenConfig() {
         GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
@@ -361,10 +370,6 @@ public class Theme {
         return gd.getDefaultConfiguration();
     }
 
-    /**
-     * Returns the usable desktop area, excluding taskbar/docked bars.
-     * This is the correct "working area" to position your pet in.
-     */
     public static Rectangle getUsableScreen() {
         GraphicsConfiguration gc = getPrimaryScreenConfig();
         Rectangle bounds = gc.getBounds();
@@ -378,23 +383,14 @@ public class Theme {
         );
     }
 
-    /**
-     * Returns the actual screen insets for the primary screen.
-     */
     public static Insets getScreenInsets() {
         return Toolkit.getDefaultToolkit().getScreenInsets(getPrimaryScreenConfig());
     }
 
-    /**
-     * Returns DPI scale using the graphics transform.
-     */
     public static double getDpiScale() {
         return getPrimaryScreenConfig().getDefaultTransform().getScaleX();
     }
 
-    /**
-     * Scales a logical pixel value by current DPI.
-     */
     public static int scaled(int pixels) {
         return (int) Math.round(pixels * getDpiScale());
     }

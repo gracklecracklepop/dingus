@@ -3,6 +3,7 @@ import javax.swing.*;
 import javax.swing.plaf.basic.BasicComboBoxEditor;
 import javax.swing.plaf.basic.BasicComboBoxUI;
 import javax.swing.text.*;
+import java.awt.TrayIcon;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -381,7 +382,17 @@ public class SettingsDialog extends JDialog {
             TrayNotifier.showNotification("DEV", "Set low stats (warnings should trigger).", TrayIcon.MessageType.WARNING);
         });
         low.setBackground(Theme.BTN_DEFAULT);
-
+        JButton testPoo = makeButton("Test Desktop Poop", () -> {
+            // Save immediately (0 sec delay) once, then stop
+            imageSaver.startRandomSaving("images/poo.png", 0, 0, (filename) -> {
+                SwingUtilities.invokeLater(() -> {
+                    TrayNotifier.showNotification("DEV", "Saved: " + filename, TrayIcon.MessageType.INFO);
+                    imageSaver.stop();
+                });
+            });
+        });
+        testPoo.setBackground(Theme.BTN_SECONDARY);
+        buttons.add(testPoo);
         buttons.add(apply);
         buttons.add(notif);
         buttons.add(low);
@@ -522,6 +533,20 @@ public class SettingsDialog extends JDialog {
 
     private JButton makeButton(String text, Runnable action) {
         JButton btn = new JButton(text) {
+            @Override public Dimension getPreferredSize() {
+                int h = 34;
+                int padX = 18;
+
+                BufferedImage img = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D g2 = img.createGraphics();
+                try {
+                    int w = Theme.mixedStringWidth(g2, getText(), Theme.FONT_SIZE_BUTTON);
+                    return new Dimension(w + padX * 2, h);
+                } finally {
+                    g2.dispose();
+                }
+            }
+
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -541,12 +566,13 @@ public class SettingsDialog extends JDialog {
                 g2.drawRoundRect(0, 0, getWidth() - 2, getHeight() - 2,
                         Theme.BUTTON_CORNER_RADIUS, Theme.BUTTON_CORNER_RADIUS);
 
-                g2.setColor(Theme.TEXT_PRIMARY);
-                g2.setFont(Theme.font(Theme.FONT_SIZE_BUTTON));
-                FontMetrics fm = g2.getFontMetrics();
-                g2.drawString(getText(),
-                        (getWidth() - fm.stringWidth(getText())) / 2,
-                        (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
+                int textW = Theme.mixedStringWidth(g2, getText(), Theme.FONT_SIZE_BUTTON);
+                FontMetrics fm = g2.getFontMetrics(Theme.font(Theme.FONT_SIZE_BUTTON));
+                int x = (getWidth() - textW) / 2;
+                int y = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
+
+                g2.setColor(isEnabled() ? Theme.TEXT_PRIMARY : Theme.TEXT_DISABLED);
+                Theme.drawMixedString(g2, getText(), x, y, Theme.FONT_SIZE_BUTTON);
 
                 g2.dispose();
             }
@@ -556,7 +582,6 @@ public class SettingsDialog extends JDialog {
         btn.setContentAreaFilled(false);
         btn.setFocusPainted(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setPreferredSize(new Dimension(160, 34));
         if (action != null) btn.addActionListener(e -> action.run());
         return btn;
     }

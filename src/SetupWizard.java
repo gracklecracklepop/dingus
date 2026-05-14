@@ -224,7 +224,7 @@ public class SetupWizard extends JDialog {
         ramTitle.setFont(Theme.font(Theme.FONT_SIZE_HEADING));
 
         ramLiveStats = new JLabel("Initializing scanner...", SwingConstants.CENTER);
-        ramLiveStats.setForeground(Theme.ACCENT_RAM);
+        ramLiveStats.setForeground(Theme.TEXT_PRIMARY);
         ramLiveStats.setFont(Theme.font(Theme.FONT_SIZE_BODY));
 
         JPanel center = new JPanel(new GridLayout(2, 1, 0, 10));
@@ -473,8 +473,9 @@ public class SetupWizard extends JDialog {
             newStats.setName(nameField.getText());
             newStats.setGender((String) genderBox.getSelectedItem());
             newStats.setSpriteColor((String) colorBox.getSelectedItem());
-            newStats.setHunger(100); newStats.setHappiness(100);
-            newStats.setEnergy(100); newStats.setCoins(0);
+            newStats.setHunger(70);
+            newStats.setHappiness(70);
+            newStats.setEnergy(70);
 
             cardLayout.show(cardPanel, "bedplace");
         });
@@ -644,6 +645,20 @@ public class SetupWizard extends JDialog {
 
     private JButton makeButton(String text, Runnable action) {
         JButton btn = new JButton(text) {
+            @Override public Dimension getPreferredSize() {
+                int h = 40;     // wizard buttons are taller
+                int padX = 18;
+
+                BufferedImage img = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D g2 = img.createGraphics();
+                try {
+                    int w = Theme.mixedStringWidth(g2, getText(), Theme.FONT_SIZE_BUTTON);
+                    return new Dimension(w + padX * 2, h);
+                } finally {
+                    g2.dispose();
+                }
+            }
+
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -663,16 +678,18 @@ public class SetupWizard extends JDialog {
                 g2.drawRoundRect(0, 0, getWidth() - 2, getHeight() - 2,
                         Theme.BUTTON_CORNER_RADIUS, Theme.BUTTON_CORNER_RADIUS);
 
+                int textW = Theme.mixedStringWidth(g2, getText(), Theme.FONT_SIZE_BUTTON);
+                FontMetrics fm = g2.getFontMetrics(Theme.font(Theme.FONT_SIZE_BUTTON));
+                int x = (getWidth() - textW) / 2;
+                int y = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
+
                 g2.setColor(isEnabled() ? Theme.TEXT_PRIMARY : Theme.TEXT_DISABLED);
-                g2.setFont(Theme.font(Theme.FONT_SIZE_BUTTON));
-                FontMetrics fm = g2.getFontMetrics();
-                g2.drawString(getText(),
-                        (getWidth() - fm.stringWidth(getText())) / 2,
-                        (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
+                Theme.drawMixedString(g2, getText(), x, y, Theme.FONT_SIZE_BUTTON);
 
                 g2.dispose();
             }
         };
+
         btn.setBackground(Theme.BTN_DEFAULT);
         btn.setBorderPainted(false);
         btn.setContentAreaFilled(false);

@@ -3,9 +3,9 @@ import java.util.Set;
 
 public class PetStats {
 
-    public double hunger = 100;
-    public int happiness = 100;
-    public int energy = 100;
+    public double hunger = 70;
+    public int happiness = 70;
+    public int energy = 70;
     public int coins = 0;
 
 

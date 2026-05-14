@@ -14,6 +14,23 @@ public class PetMenu {
     private final JDialog hostDialog;
     private final Runnable onExternalStatsChanged;
 
+    // ── Hunger gain from system usage ───────────────────────────────
+    private static final double RAM_MIB_PER_HUNGER_PER_SEC = 1500.0;
+    private static final double CPU_PCT_PER_HUNGER_PER_SEC = 80.0;
+    private static final double MAX_HUNGER_GAIN_PER_TICK = 2.0;
+
+    private long lastAutoSaveMs = 0;
+    private static final long AUTO_SAVE_INTERVAL_MS = 10_000;
+
+    // ── Poop feature ───────────────────────────────────────────────
+    private static final double POOP_HUNGER_THRESHOLD = 70.0;   // requested
+    private static final int POOP_MIN_DELAY_SEC = 60;
+    private static final int POOP_MAX_DELAY_SEC = 180;
+    private static final double POOP_HUNGER_DROP = 10.0;        // requested
+    private static final int POOP_HAPPINESS_GAIN = 5;
+
+    private boolean poopNotified = false;
+
     private CardLayout cardLayout;
     private JPanel container;
 
@@ -29,10 +46,11 @@ public class PetMenu {
     private JButton feedButton;
     private Timer cooldownTimer;
 
-    // ── RAM tracking ─────────────────────────────────────────────
-    long ramUse;
-    long base;
+    // ── RAM/CPU tracking ─────────────────────────────────────────
+    long ramUse;         // used MiB live
+    long base;           // baseline MiB for happiness decay
     private javax.swing.Timer usageTimer;
+
     OperatingSystemMXBean osBean = (OperatingSystemMXBean)
             ManagementFactory.getOperatingSystemMXBean();
 
@@ -46,31 +64,9 @@ public class PetMenu {
     // ── Sleep ────────────────────────────────────────────────────
     private Timer sleepTimer;
 
-    // ── Sleep tuning ────────────────────────────────────────────────
-// How quickly sleep becomes effective (bigger = slower)
+    // ── Sleep tuning ─────────────────────────────────────────────
     private static final double SLEEP_HALF_LIFE_MIN = 45.0;
-
-    // Maximum energy you can restore purely from sleep (before clamping to 100)
     private static final int MAX_SLEEP_GAIN = 90;
-
-    private static int clampInt(int v, int lo, int hi) {
-        return Math.max(lo, Math.min(hi, v));
-    }
-
-    /**
-     * Returns the ENERGY TARGET after sleeping `minutes`, starting from `startEnergy`.
-     * More minutes => more gain, up to 100.
-     */
-    private int computeSleepTargetEnergy(int startEnergy, int minutes) {
-        minutes = clampInt(minutes, 1, 180);
-
-        // Exponential “rest curve”: gain rises quickly early, then slows (feels natural)
-        // gain = MAX_GAIN * (1 - exp(-minutes / halfLife))
-        double gain = MAX_SLEEP_GAIN * (1.0 - Math.exp(-minutes / SLEEP_HALF_LIFE_MIN));
-        int gainInt = (int) Math.round(gain);
-
-        return clampInt(startEnergy + gainInt, 0, 100);
-    }
 
     // ── Touch Grass mini-game ────────────────────────────────────
     private boolean grassGameActive = false;
@@ -93,8 +89,6 @@ public class PetMenu {
         container  = new JPanel(cardLayout);
         container.setOpaque(false);
 
-
-
         container.add(buildMainMenu(), "menu");
         container.add(buildDeadMenu(), "dead");
         this.panel = container;
@@ -104,21 +98,17 @@ public class PetMenu {
             return;
         }
 
-// only start timers if alive
         cooldownTimer = new Timer(1000, e -> refreshFeedButton());
         cooldownTimer.start();
 
-        base = stats.getBaseRam();
+        base = stats.getBaseRam(); // MiB baseline
         startUsageTimer();
         startHappinessDecayTimer();
         maybeNotifyThresholds();
-
-
     }
 
     public JPanel getPanel() { return panel; }
 
-    // ── Called after Settings changes ────────────────────────────
     public void refreshFromStats() {
         if (nameLabel != null) {
             String name = stats.getName();
@@ -132,11 +122,46 @@ public class PetMenu {
         panel.repaint();
     }
 
-    // ───────────────────────── RAM usage hooks ─────────────────────────
+    // ───────────────────────── RAM+CPU usage hooks ─────────────────────────
 
-    public void usageAdd() throws InterruptedException {
-        ramUse = ramUsage.runRamLiveMode((com.sun.management.OperatingSystemMXBean) osBean);
-        stats.addHunger(((double)(ramUse - base)) / 1000000.0);
+    public void usageAdd() {
+        com.sun.management.OperatingSystemMXBean os =
+                (com.sun.management.OperatingSystemMXBean) osBean;
+
+        long usedMiB  = ramUsage.runRamLiveMode(os);
+        double cpuPct = ramUsage.runCpuLiveMode(os);
+
+        ramUse = usedMiB;
+
+        // if scans were skipped, set a baseline once so deltas are not always zero
+        ensureUsageBaselines(usedMiB, cpuPct);
+
+        double baseRam = stats.getBaseRam();   // MiB
+        double baseCpu = stats.getBaseCpu();   // %
+
+        // NOTE: deltas can be negative -> hunger can decrease too
+        double deltaRam = usedMiB - baseRam;
+        double deltaCpu = cpuPct - baseCpu;
+
+        // usage drives hunger up/down
+        double hungerDelta =
+                (deltaRam / RAM_MIB_PER_HUNGER_PER_SEC) +
+                        (deltaCpu / CPU_PCT_PER_HUNGER_PER_SEC);
+
+        hungerDelta = clamp(hungerDelta, -MAX_HUNGER_GAIN_PER_TICK, MAX_HUNGER_GAIN_PER_TICK);
+
+        if (hungerDelta != 0) stats.addHunger(hungerDelta);
+
+        // autosave throttled
+        long now = System.currentTimeMillis();
+        if (now - lastAutoSaveMs >= AUTO_SAVE_INTERVAL_MS) {
+            SaveManager.save(stats);
+            lastAutoSaveMs = now;
+        }
+        System.out.println("RAM " + usedMiB + "MiB (base " + stats.getBaseRam() + ") "
+                + "CPU " + String.format("%.1f", cpuPct) + "% (base " + String.format("%.1f", stats.getBaseCpu()) + ") "
+                + "hungerDelta=" + String.format("%.3f", hungerDelta)
+                + " hunger=" + String.format("%.2f", stats.getHunger()));
         updateLiveStats();
         maybeNotifyThresholds();
     }
@@ -145,10 +170,7 @@ public class PetMenu {
         if (usageTimer != null) usageTimer.stop();
         usageTimer = new javax.swing.Timer(1000, e -> {
             try { usageAdd(); }
-            catch (InterruptedException ignored) {
-            } catch (RuntimeException ex) {
-                ex.printStackTrace();
-            }
+            catch (RuntimeException ex) { ex.printStackTrace(); }
         });
         usageTimer.start();
     }
@@ -159,7 +181,7 @@ public class PetMenu {
         if (happinessDecayTimer != null) happinessDecayTimer.stop();
 
         happinessDecayTimer = new Timer(60_000, e -> {
-            double baseLossPerMin = 30.0 / 180.0; // ~30 over 3 hours
+            double baseLossPerMin = 30.0 / 180.0;
             double delta = Math.max(0, (double) ramUse - (double) base);
             double ramFactor = 1.0 + Math.min(2.0, delta / 1500.0);
             double loss = baseLossPerMin * ramFactor;
@@ -197,7 +219,7 @@ public class PetMenu {
         if (stats.getEnergy() >= 40) energyWarned = false;
     }
 
-    // ── Touch Grass game ─────────────────────────────────────────
+    // ── Touch Grass mini-game ────────────────────────────────────
 
     private boolean grassGameShouldContinue() {
         return stats.getHappiness() < 100 && stats.getEnergy() > 0;
@@ -207,30 +229,17 @@ public class PetMenu {
         TrayNotifier.ensureInitialized();
 
         if (stats.getEnergy() <= 30) {
-            TrayNotifier.showNotification(
-                    "Dingus",
-                    "I'm too tired to play... let me sleep.",
-                    TrayIcon.MessageType.WARNING
-            );
+            TrayNotifier.showNotification("Dingus", "I'm too tired to play... let me sleep.", TrayIcon.MessageType.WARNING);
             return;
         }
 
         if (stats.getHappiness() >= 70) {
-            TrayNotifier.showNotification(
-                    "Dingus",
-                    "I'm already super happy! No more play right now.",
-                    TrayIcon.MessageType.INFO
-            );
+            TrayNotifier.showNotification("Dingus", "I'm already super happy! No more play right now.", TrayIcon.MessageType.INFO);
             return;
         }
 
         grassGameActive = true;
-        TrayNotifier.showNotification(
-                "Dingus",
-                "Let's play! Drag me onto the grass tab.",
-                TrayIcon.MessageType.INFO
-        );
-
+        TrayNotifier.showNotification("Dingus", "Let's play! Drag me onto the grass tab.", TrayIcon.MessageType.INFO);
         openNextGrassTab();
     }
 
@@ -257,8 +266,6 @@ public class PetMenu {
 
         try {
             String url = GRASS_URLS[(int)(Math.random() * GRASS_URLS.length)];
-
-            // IMPORTANT: do NOT use hostDialog as owner (owned dialogs stay above owner)
             Window grassOwner = (hostDialog.getOwner() instanceof Window w) ? w : null;
 
             currentGrassTab = new GrassDialog(grassOwner, url, () -> {
@@ -268,14 +275,12 @@ public class PetMenu {
 
             currentGrassTab.setVisible(true);
 
-            // push tab behind; pull Dingus in front
             SwingUtilities.invokeLater(() -> {
                 currentGrassTab.toBack();
 
                 hostDialog.setAlwaysOnTop(true);
                 hostDialog.toFront();
 
-                // optional “bump” for stubborn WMs:
                 hostDialog.setAlwaysOnTop(false);
                 hostDialog.setAlwaysOnTop(true);
                 hostDialog.toFront();
@@ -287,18 +292,15 @@ public class PetMenu {
         }
     }
 
-    /** Called by PetPanel on mouse release (drag end). */
     public void checkGrassDrop(Rectangle petBoundsOnScreen) {
         if (!grassGameActive) return;
 
         GrassDialog hit = GrassDialog.findIntersecting(petBoundsOnScreen);
         if (hit == null) return;
 
-        // Update stats ONLY on successful drag-over-drop
         stats.addHappiness(30);
         stats.addEnergy(-10);
 
-        // Clamp if your PetStats doesn't already
         if (stats.getHappiness() > 100) stats.setHappiness(100);
         if (stats.getEnergy() < 0) stats.setEnergy(0);
 
@@ -308,13 +310,44 @@ public class PetMenu {
 
         TrayNotifier.showNotification("Dingus", "Touched grass!", TrayIcon.MessageType.INFO);
 
-        // Closing triggers next tab via callback
         try { hit.dispose(); } catch (Exception ignored) {}
 
         if (!grassGameShouldContinue()) stopTouchGrassGame();
     }
 
     // ── Sleep ───────────────────────────────────────────────────
+
+    private static int clampInt(int v, int lo, int hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+
+    private static double clamp(double v, double lo, double hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+    private void ensureUsageBaselines(long usedMiB, double cpuPct) {
+        boolean changed = false;
+
+        if (stats.getBaseRam() <= 0) {
+            stats.setBaseRam(usedMiB);
+            base = usedMiB;         // keep happiness decay baseline consistent too
+            changed = true;
+        }
+        if (stats.getBaseCpu() <= 0) {
+            stats.setBaseCpu(cpuPct);
+            changed = true;
+        }
+
+        if (changed) SaveManager.save(stats);
+    }
+
+    private int computeSleepTargetEnergy(int startEnergy, int minutes) {
+        minutes = clampInt(minutes, 1, 180);
+        double gain = MAX_SLEEP_GAIN * (1.0 - Math.exp(-minutes / SLEEP_HALF_LIFE_MIN));
+        int gainInt = (int) Math.round(gain);
+        return clampInt(startEnergy + gainInt, 0, 100);
+    }
 
     private void startSleepPrompt() {
         Integer minutes = SleepDurationDialog.promptMinutes(hostDialog);
@@ -332,26 +365,19 @@ public class PetMenu {
     private void startSleepForMinutes(int minutes) {
         if (sleepTimer != null) sleepTimer.stop();
 
-        // stop grass game during sleep (if you have it)
-        // stopTouchGrassGame();
-
         minutes = clampInt(minutes, 1, 180);
 
         final int startEnergy  = clampInt(stats.getEnergy(), 0, 100);
         final int targetEnergy = computeSleepTargetEnergy(startEnergy, minutes);
         final int totalSeconds = minutes * 60;
 
-        // Hide pet while sleeping
         PetTray.hide(hostDialog);
 
-        // If target == start, just wait then show again (still “slept”)
         final int[] elapsed = {0};
         sleepTimer = new Timer(1000, e -> {
             elapsed[0]++;
 
             double t = Math.min(1.0, elapsed[0] / (double) totalSeconds);
-
-            // Interpolate to the TARGET (not always 100)
             int newEnergy = (int) Math.round(startEnergy + (targetEnergy - startEnergy) * t);
             newEnergy = clampInt(newEnergy, 0, 100);
 
@@ -361,16 +387,11 @@ public class PetMenu {
             if (elapsed[0] >= totalSeconds) {
                 sleepTimer.stop();
 
-                // Ensure exactly target at end
                 stats.setEnergy(targetEnergy);
                 SaveManager.save(stats);
 
                 PetTray.show(hostDialog);
-                TrayNotifier.showNotification(
-                        "Dingus",
-                        "I woke up! Energy: " + targetEnergy + "%.",
-                        TrayIcon.MessageType.INFO
-                );
+                TrayNotifier.showNotification("Dingus", "I woke up! Energy: " + targetEnergy + "%.", TrayIcon.MessageType.INFO);
                 maybeNotifyThresholds();
             }
         });
@@ -409,6 +430,8 @@ public class PetMenu {
         feedButton.repaint();
     }
 
+    // ── Dead menu ────────────────────────────────────────────────
+
     private JPanel buildDeadMenu() {
         JPanel wrapper = new JPanel(new BorderLayout()) {
             @Override protected void paintComponent(Graphics g) {
@@ -418,8 +441,6 @@ public class PetMenu {
             }
         };
         wrapper.setOpaque(false);
-
-        // IMPORTANT: keep titlebar overlay so traffic lights still work
         wrapper.add(buildTitleBarLayer(), BorderLayout.NORTH);
 
         JPanel body = new JPanel(new BorderLayout());
@@ -436,11 +457,12 @@ public class PetMenu {
     }
 
     private void enterDeadStateUI() {
-        // stop timers so nothing changes after death
         try { if (cooldownTimer != null) cooldownTimer.stop(); } catch (Exception ignored) {}
         try { if (usageTimer != null) usageTimer.stop(); } catch (Exception ignored) {}
         try { if (happinessDecayTimer != null) happinessDecayTimer.stop(); } catch (Exception ignored) {}
         try { if (sleepTimer != null) sleepTimer.stop(); } catch (Exception ignored) {}
+
+        try { imageSaver.stop(); } catch (Exception ignored) {}
 
         grassGameActive = false;
         try { if (currentGrassTab != null) currentGrassTab.dispose(); } catch (Exception ignored) {}
@@ -448,7 +470,6 @@ public class PetMenu {
 
         cardLayout.show(container, "dead");
 
-        // Center the host window (menu panel will be visible when PetPanel opens it)
         SwingUtilities.invokeLater(() -> {
             Rectangle u = Theme.getUsableScreen();
             hostDialog.setLocation(
@@ -461,7 +482,6 @@ public class PetMenu {
         panel.repaint();
     }
 
-    /** Call this after any stat update. */
     private void checkDeathAndHandle() {
         if (stats.isDead()) return;
 
@@ -471,10 +491,8 @@ public class PetMenu {
 
         if (!deadNow) return;
 
-        // one final message
         TrayNotifier.showNotification("Dingus", stats.pronounSubject() + " died :(", TrayIcon.MessageType.ERROR);
 
-        // permanently dead
         stats.setDead(true);
         stats.setName("Dead");
         stats.setCoins(0);
@@ -483,10 +501,8 @@ public class PetMenu {
         stats.setEnergy(0);
 
         SaveManager.save(stats);
-
         enterDeadStateUI();
 
-        // ask PetPanel to refresh (your onExternalStatsChanged already repaints the pet)
         if (onExternalStatsChanged != null) SwingUtilities.invokeLater(onExternalStatsChanged);
     }
 
@@ -561,15 +577,13 @@ public class PetMenu {
         content.add(feedButton);
         refreshFeedButton();
 
-        // Play now starts the mini-game (no stat changes until drag-over-drop)
         addButton(content, "🎾 Play", this::startTouchGrassGame);
-
         addButton(content, "😴 Sleep", this::startSleepPrompt);
 
         addButton(content, "🛒 Shop", () -> {
             ShopDialog shop = new ShopDialog(hostDialog, hostDialog, stats, () -> {
                 refreshFromStats();
-                if (onExternalStatsChanged != null) onExternalStatsChanged.run(); // repaint pet
+                if (onExternalStatsChanged != null) onExternalStatsChanged.run();
             });
             shop.setVisible(true);
         });
@@ -655,9 +669,7 @@ public class PetMenu {
     }
 
     private JButton makeTrafficHitbox(Runnable action, String tooltip) {
-        JButton b = new JButton() {
-            @Override protected void paintComponent(Graphics g) { }
-        };
+        JButton b = new JButton() { @Override protected void paintComponent(Graphics g) {} };
         b.setBorderPainted(false);
         b.setContentAreaFilled(false);
         b.setFocusPainted(false);
@@ -676,6 +688,7 @@ public class PetMenu {
 
     private void updateLiveStats() {
         if (stats.isDead()) return;
+
         updateBar(hungerBar,    hungerLabel,    "Hunger",    stats.getHunger());
         updateBar(happinessBar, happinessLabel, "Happiness", stats.getHappiness());
         updateBar(energyBar,    energyLabel,    "Energy",    stats.getEnergy());
@@ -685,11 +698,63 @@ public class PetMenu {
             mainMenuCoinLabel.revalidate();
             mainMenuCoinLabel.repaint();
         }
-        panel.repaint();
 
         panel.repaint();
 
         checkDeathAndHandle();
+        maybePoopWhenHighHunger();
+    }
+
+    // ── POOP LOGIC (fixed) ───────────────────────────────────────
+
+    private void maybePoopWhenHighHunger() {
+        if (stats.isDead()) {
+            imageSaver.stop();
+            return;
+        }
+
+        double h = stats.getHunger();
+
+        // Hunger not high anymore => stop saver, reset message latch
+        if (h <= POOP_HUNGER_THRESHOLD) {
+            poopNotified = false;
+            if (imageSaver.isRunning()) imageSaver.stop();
+            return;
+        }
+
+        // Hunger high => ensure saver is running
+        if (imageSaver.isRunning()) return;
+
+        boolean started = imageSaver.startRandomSaving(
+                "images/poo.png",
+                POOP_MIN_DELAY_SEC,
+                POOP_MAX_DELAY_SEC,
+                (filename) -> SwingUtilities.invokeLater(() -> {
+                    // This runs when an image was actually saved.
+                    if (!poopNotified) {
+                        poopNotified = true;
+                        TrayNotifier.showNotification("Dingus", "Dingus pooped on your desktop.", TrayIcon.MessageType.INFO);
+                    }
+
+                    stats.addHunger(-POOP_HUNGER_DROP);
+                    stats.addHappiness(POOP_HAPPINESS_GAIN);
+
+                    SaveManager.save(stats);
+
+                    updateLiveStats();
+                    maybeNotifyThresholds();
+
+                    // Stop saver once we’ve dropped out of the “high hunger” zone
+                    if (stats.getHunger() <= POOP_HUNGER_THRESHOLD) {
+                        imageSaver.stop();
+                    }
+                })
+        );
+
+        if (!started) {
+            // If it failed to start (e.g., poo.png missing), tell the dev in console.
+            System.err.println("[PetMenu] imageSaver failed to start (check images/poo.png path).");
+        }
     }
 
     // ── Mixed ellipsis ──────────────────────────────────────────
@@ -721,8 +786,6 @@ public class PetMenu {
         finally { g2.dispose(); }
     }
 
-    // ── Small UI helpers ────────────────────────────────────────
-
     private JLabel styledLabel(String text) {
         return Theme.mixedLabel(text, Theme.FONT_SIZE_LABEL, Theme.TEXT_PRIMARY);
     }
@@ -739,7 +802,7 @@ public class PetMenu {
         JButton btn = new JButton(text) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,      RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
                 Color bg = getBackground();
@@ -810,7 +873,7 @@ public class PetMenu {
         p.setOpaque(false);
         p.setMaximumSize(new Dimension(Theme.MENU_WIDTH - 30, 30));
         p.add(label, BorderLayout.NORTH);
-        p.add(bar,   BorderLayout.CENTER);
+        p.add(bar, BorderLayout.CENTER);
         return p;
     }
 
