@@ -4,8 +4,8 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -20,7 +20,7 @@ public class Main {
 
         Theme.applyUIManagerDefaults();
 
-        TrayNotifier.DEFAULT_ICON_PATH = "images/yarn_icon.png";
+        TrayNotifier.DEFAULT_ICON_PATH = "/images/yarn_icon.png";
         TrayNotifier.ensureInitialized();
 
         SwingUtilities.invokeLater(() -> {
@@ -48,7 +48,7 @@ public class Main {
             ));
 
             // ── Bed dialog: CREATE + POSITION, but DO NOT SHOW at boot ─────────
-            // This prevents the “bed only” flash.
+            // This prevents the "bed only" flash.
             BedDialog bed = new BedDialog();
             bed.positionAtBottom();
             bed.setVisible(false);
@@ -99,7 +99,7 @@ public class Main {
                 dialog.toFront();
             });
 
-            imageSaver.startRandomSaving("images/poo.png", 1800, 3600);
+            imageSaver.startRandomSaving("/images/poo.png", 1800, 3600);
         });
     }
 
@@ -140,9 +140,11 @@ public class Main {
     }
 
     static Image loadAppIcon() {
-        for (String path : new String[]{"images/icon.png", "images/yarn_icon.png"}) {
-            try { return ImageIO.read(new File(path)); }
-            catch (IOException ignored) {}
+        for (String path : new String[]{"/images/icon.png", "/images/yarn_icon.png"}) {
+            try {
+                InputStream is = Main.class.getResourceAsStream(path);
+                if (is != null) return ImageIO.read(is);
+            } catch (IOException ignored) {}
         }
         return createFallbackIcon();
     }

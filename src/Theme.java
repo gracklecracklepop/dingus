@@ -2,7 +2,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.font.TextAttribute;
 import java.awt.image.BufferedImage;
-import java.io.File;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -60,7 +60,7 @@ public class Theme {
     public static final Color SCROLLBAR_TRACK = new Color(0,0,0,0);
 
     // FONT CONFIG
-    public static final String FONT_PATH     = "images/Atop.ttf";
+    public static final String FONT_PATH     = "/images/Atop.ttf";
     public static final String FONT_FALLBACK = "Arial";
     public static final String EMOJI_FONT    = "Segoe UI Emoji";
 
@@ -171,9 +171,12 @@ public class Theme {
     public static Font font(int size) {
         if (cachedBaseFont == null) {
             try {
-                cachedBaseFont = Font.createFont(Font.TRUETYPE_FONT, new File(FONT_PATH));
+                InputStream is = Theme.class.getResourceAsStream(FONT_PATH);
+                if (is == null) throw new Exception("Font resource not found: " + FONT_PATH);
+                cachedBaseFont = Font.createFont(Font.TRUETYPE_FONT, is);
                 GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(cachedBaseFont);
             } catch (Exception e) {
+                System.err.println("Failed to load font: " + e.getMessage());
                 cachedBaseFont = new Font(FONT_FALLBACK, Font.PLAIN, size);
             }
         }

@@ -2,12 +2,12 @@ import com.sun.management.OperatingSystemMXBean;
 
 public class ramUsage {
 
-    /** Returns used RAM in MiB (matches SetupWizard baseRam units). */
+
     public static long runRamLiveMode(OperatingSystemMXBean osBean) {
         long total = osBean.getTotalMemorySize();
         long free  = osBean.getFreeMemorySize();
         long used  = total - free;
-        return used / (1024L * 1024L);
+        return used / (1000000);
     }
 
     /** Returns CPU load as percent (0..100). Non-blocking. */

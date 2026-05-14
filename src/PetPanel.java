@@ -3,8 +3,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -218,29 +218,29 @@ public class PetPanel extends JPanel {
     public void setimages(String color) {
         switch (color) {
             case "Void (Black)" -> {
-                normalImage = loadImage("dingus - Copy/blacksitting.png");
-                dragImage   = loadImage("dingus - Copy/blackscruff.png");
-                bedImage    = loadImage("dingus - Copy/blackinbed.png");
-                bedAlone    = loadImage("dingus - Copy/blackbed.png");
+                normalImage = loadImage("/dingus - Copy/blacksitting.png");
+                dragImage   = loadImage("/dingus - Copy/blackscruff.png");
+                bedImage    = loadImage("/dingus - Copy/blackinbed.png");
+                bedAlone    = loadImage("/dingus - Copy/blackbed.png");
             }
             case "Ghost (White)" -> {
-                normalImage = loadImage("dingus - Copy/whitesitting.png");
-                dragImage   = loadImage("dingus - Copy/whitescruff.png");
-                bedImage    = loadImage("dingus - Copy/whiteinbed.png");
-                bedAlone    = loadImage("dingus - Copy/whitebed.png");
+                normalImage = loadImage("/dingus - Copy/whitesitting.png");
+                dragImage   = loadImage("/dingus - Copy/whitescruff.png");
+                bedImage    = loadImage("/dingus - Copy/whiteinbed.png");
+                bedAlone    = loadImage("/dingus - Copy/whitebed.png");
             }
             default -> {
-                normalImage = loadImage("dingus - Copy/orangesitting.png");
-                dragImage   = loadImage("dingus - Copy/orangescruff.png");
-                bedImage    = loadImage("dingus - Copy/orangeinbed.png");
-                bedAlone    = loadImage("dingus - Copy/orangebed.png");
+                normalImage = loadImage("/dingus - Copy/orangesitting.png");
+                dragImage   = loadImage("/dingus - Copy/orangescruff.png");
+                bedImage    = loadImage("/dingus - Copy/orangeinbed.png");
+                bedAlone    = loadImage("/dingus - Copy/orangebed.png");
             }
         }
 
         if (normalImage == null) normalImage = dragImage;
         if (dragImage == null) dragImage = normalImage;
         if (bedImage == null) bedImage = normalImage;
-        if (bedAlone == null) bedAlone = loadImage("dingus - Copy/orangebed.png");
+        if (bedAlone == null) bedAlone = loadImage("/dingus - Copy/orangebed.png");
 
         baseScale = -1;
     }
@@ -409,9 +409,18 @@ public class PetPanel extends JPanel {
         return btn;
     }
 
-    private static BufferedImage loadImage(String path) {
-        try { return ImageIO.read(new File(path)); }
-        catch (IOException e) { return null; }
+    private BufferedImage loadImage(String path) {
+        try {
+            InputStream is = getClass().getResourceAsStream(path);
+            if (is == null) {
+                System.err.println("Resource not found: " + path);
+                return null;
+            }
+            return ImageIO.read(is);
+        } catch (IOException e) {
+            System.err.println("Failed to load image: " + path);
+            return null;
+        }
     }
 
     // ── Petting + sparkles ───────────────────────────────────────────────────

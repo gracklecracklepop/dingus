@@ -133,7 +133,6 @@ public class PetMenu {
 
         ramUse = usedMiB;
 
-        // if scans were skipped, set a baseline once so deltas are not always zero
         ensureUsageBaselines(usedMiB, cpuPct);
 
         double baseRam = stats.getBaseRam();   // MiB
