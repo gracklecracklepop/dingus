@@ -93,17 +93,27 @@ public class PetMenu {
         container  = new JPanel(cardLayout);
         container.setOpaque(false);
 
+
+
         container.add(buildMainMenu(), "menu");
+        container.add(buildDeadMenu(), "dead");
         this.panel = container;
 
+        if (stats.isDead()) {
+            enterDeadStateUI();
+            return;
+        }
+
+// only start timers if alive
         cooldownTimer = new Timer(1000, e -> refreshFeedButton());
         cooldownTimer.start();
 
         base = stats.getBaseRam();
         startUsageTimer();
         startHappinessDecayTimer();
-
         maybeNotifyThresholds();
+
+
     }
 
     public JPanel getPanel() { return panel; }
@@ -399,6 +409,87 @@ public class PetMenu {
         feedButton.repaint();
     }
 
+    private JPanel buildDeadMenu() {
+        JPanel wrapper = new JPanel(new BorderLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                Theme.paintMacWindow(g2, getWidth(), getHeight(), "");
+                g2.dispose();
+            }
+        };
+        wrapper.setOpaque(false);
+
+        // IMPORTANT: keep titlebar overlay so traffic lights still work
+        wrapper.add(buildTitleBarLayer(), BorderLayout.NORTH);
+
+        JPanel body = new JPanel(new BorderLayout());
+        body.setOpaque(false);
+        body.setBorder(BorderFactory.createEmptyBorder(18, 14, 14, 14));
+
+        JLabel msg = new JLabel(stats.pronounSubject() + " died :(", SwingConstants.CENTER);
+        msg.setForeground(Theme.TEXT_PRIMARY);
+        msg.setFont(Theme.font(Theme.FONT_SIZE_HEADING));
+        body.add(msg, BorderLayout.CENTER);
+
+        wrapper.add(body, BorderLayout.CENTER);
+        return wrapper;
+    }
+
+    private void enterDeadStateUI() {
+        // stop timers so nothing changes after death
+        try { if (cooldownTimer != null) cooldownTimer.stop(); } catch (Exception ignored) {}
+        try { if (usageTimer != null) usageTimer.stop(); } catch (Exception ignored) {}
+        try { if (happinessDecayTimer != null) happinessDecayTimer.stop(); } catch (Exception ignored) {}
+        try { if (sleepTimer != null) sleepTimer.stop(); } catch (Exception ignored) {}
+
+        grassGameActive = false;
+        try { if (currentGrassTab != null) currentGrassTab.dispose(); } catch (Exception ignored) {}
+        currentGrassTab = null;
+
+        cardLayout.show(container, "dead");
+
+        // Center the host window (menu panel will be visible when PetPanel opens it)
+        SwingUtilities.invokeLater(() -> {
+            Rectangle u = Theme.getUsableScreen();
+            hostDialog.setLocation(
+                    u.x + (u.width - hostDialog.getWidth()) / 2,
+                    u.y + (u.height - hostDialog.getHeight()) / 2
+            );
+        });
+
+        panel.revalidate();
+        panel.repaint();
+    }
+
+    /** Call this after any stat update. */
+    private void checkDeathAndHandle() {
+        if (stats.isDead()) return;
+
+        boolean deadNow = stats.getHunger() < 20
+                && stats.getHappiness() < 20
+                && stats.getEnergy() < 20;
+
+        if (!deadNow) return;
+
+        // one final message
+        TrayNotifier.showNotification("Dingus", stats.pronounSubject() + " died :(", TrayIcon.MessageType.ERROR);
+
+        // permanently dead
+        stats.setDead(true);
+        stats.setName("Dead");
+        stats.setCoins(0);
+        stats.setHunger(0);
+        stats.setHappiness(0);
+        stats.setEnergy(0);
+
+        SaveManager.save(stats);
+
+        enterDeadStateUI();
+
+        // ask PetPanel to refresh (your onExternalStatsChanged already repaints the pet)
+        if (onExternalStatsChanged != null) SwingUtilities.invokeLater(onExternalStatsChanged);
+    }
+
     // ── UI build ────────────────────────────────────────────────
 
     private JPanel buildMainMenu() {
@@ -584,6 +675,7 @@ public class PetMenu {
     }
 
     private void updateLiveStats() {
+        if (stats.isDead()) return;
         updateBar(hungerBar,    hungerLabel,    "Hunger",    stats.getHunger());
         updateBar(happinessBar, happinessLabel, "Happiness", stats.getHappiness());
         updateBar(energyBar,    energyLabel,    "Energy",    stats.getEnergy());
@@ -594,6 +686,10 @@ public class PetMenu {
             mainMenuCoinLabel.repaint();
         }
         panel.repaint();
+
+        panel.repaint();
+
+        checkDeathAndHandle();
     }
 
     // ── Mixed ellipsis ──────────────────────────────────────────

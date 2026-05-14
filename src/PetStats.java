@@ -157,4 +157,19 @@ public class PetStats {
         System.out.println("Accessories:  " + ownedAccessories.size() + " owned");
         System.out.println("══════════════════════");
     }
+
+    // ── Death state (saved) ─────────────────────────────────────────
+    private boolean dead = false;
+
+    public boolean isDead() { return dead; }
+    public void setDead(boolean dead) { this.dead = dead; }
+
+    /** "He"/"She"/"They" based on gender string. */
+    public String pronounSubject() {
+        String g = (gender == null) ? "" : gender.toLowerCase();
+        if (g.contains("he/him") || g.startsWith("male")) return "He";
+        if (g.contains("she/her") || g.startsWith("female")) return "She";
+        if (g.contains("they/them") || g.contains("non-binary")) return "They";
+        return "They";
+    }
 }

@@ -3,10 +3,9 @@ import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.plaf.basic.BasicComboBoxEditor;
 import javax.swing.plaf.basic.BasicComboBoxUI;
-import java.awt.image.BufferedImage;
 import javax.swing.text.*;
 import java.awt.*;
-import java.awt.event.*;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
@@ -16,10 +15,13 @@ import java.util.concurrent.CancellationException;
 public class SetupWizard extends JDialog {
 
     private boolean finished = false;
-    private PetStats newStats = new PetStats();
+    private final PetStats newStats = new PetStats();
 
-    private CardLayout cardLayout = new CardLayout();
-    private JPanel cardPanel = new JPanel(cardLayout);
+    private final CardLayout cardLayout = new CardLayout();
+    private final JPanel cardPanel = new JPanel(cardLayout);
+
+    // IMPORTANT: tutorial must always be shown at least once
+    private boolean tutorialSeen = false;
 
     private JLabel ramTitle, ramLiveStats;
     private JProgressBar ramProgressBar;
@@ -31,7 +33,6 @@ public class SetupWizard extends JDialog {
     private JButton cpuNextBtn, cpuSkipBtn;
     private SwingWorker<Double, Object[]> cpuWorker;
 
-    // placement
     private JLabel bedPosLabel;
 
     static {
@@ -62,6 +63,7 @@ public class SetupWizard extends JDialog {
 
         cardPanel.setOpaque(false);
         cardPanel.add(buildIntroCard(),         "intro");
+        cardPanel.add(buildTutorialCard(),      "tutorial");
         cardPanel.add(buildRamCheckCard(),      "ram");
         cardPanel.add(buildCpuCheckCard(),      "cpu");
         cardPanel.add(buildCustomizationCard(), "custom");
@@ -94,11 +96,10 @@ public class SetupWizard extends JDialog {
         title.setFont(Theme.font(Theme.FONT_SIZE_TITLE));
 
         JTextArea instructions = new JTextArea(
-                "Before we create your pet, we measure baseline RAM/CPU.\n\n" +
-                        "For accuracy:\n" +
-                        "1. Close heavy apps\n" +
-                        "2. Let your PC idle briefly\n\n" +
-                        "Click Start to begin."
+                "Welcome to Dingus!\n\n" +
+                        "You’ll see a quick tutorial first (controls + features).\n" +
+                        "After that, you can optionally run RAM/CPU baseline scans.\n\n" +
+                        "Click Continue to begin."
         );
         instructions.setWrapStyleWord(true);
         instructions.setLineWrap(true);
@@ -111,19 +112,12 @@ public class SetupWizard extends JDialog {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
         buttonPanel.setOpaque(false);
 
-        JButton startBtn = makeButton("Start Scan", () -> {
-            cardLayout.show(cardPanel, "ram");
-            runRamTest();
-        });
-        startBtn.setBackground(Theme.BTN_PRIMARY);
-        startBtn.setPreferredSize(new Dimension(150, 40));
+        JButton continueBtn = makeButton("Continue ➡", () -> cardLayout.show(cardPanel, "tutorial"));
+        continueBtn.setBackground(Theme.BTN_PRIMARY);
+        continueBtn.setPreferredSize(new Dimension(160, 40));
 
-        JButton skipAllBtn = makeButton("Skip All ⏭", this::skipAllScans);
-        skipAllBtn.setBackground(Theme.BTN_SECONDARY);
-        skipAllBtn.setPreferredSize(new Dimension(120, 40));
-
-        buttonPanel.add(startBtn);
-        buttonPanel.add(skipAllBtn);
+        // NOTE: No “skip scans” from intro — tutorial cannot be skipped
+        buttonPanel.add(continueBtn);
 
         p.add(title, BorderLayout.NORTH);
         p.add(instructions, BorderLayout.CENTER);
@@ -131,10 +125,91 @@ public class SetupWizard extends JDialog {
         return p;
     }
 
-    private void skipAllScans() {
-        newStats.setBaseRam(0);
-        newStats.setBaseCpu(0);
-        cardLayout.show(cardPanel, "custom");
+    // ── Tutorial (ALWAYS shown before scans/customization) ──────
+
+    private JPanel buildTutorialCard() {
+        JPanel p = new JPanel(new BorderLayout(10, 12));
+        p.setOpaque(false);
+        p.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JLabel title = new JLabel("Hands-on Tutorial", SwingConstants.CENTER);
+        title.setForeground(Theme.TEXT_PRIMARY);
+        title.setFont(Theme.font(Theme.FONT_SIZE_HEADING));
+        p.add(title, BorderLayout.NORTH);
+
+        JTextArea guide = new JTextArea(
+                "GETTING STARTED\n" +
+                        "• Drag Dingus to move around your desktop.\n" +
+                        "• Use the tray icon to hide/show Dingus.\n\n" +
+
+                        "THE MENU\n" +
+                        "• Open the menu with the round button on Dingus.\n" +
+                        "• 🍖 Feed: restores Hunger and gives coins (cooldown).\n" +
+                        "• 🎾 Play: starts Touch Grass — drag Dingus onto the grass tab to score.\n" +
+                        "• 😴 Sleep: choose minutes; Dingus hides and regains Energy over time.\n" +
+                        "• 🛒 Shop: buy hats and cosmetics (owned forever).\n" +
+                        "• ⚙ Settings: change name/gender/color and rerun baselines.\n\n" +
+
+                        "PETTING (SPARKLES)\n" +
+                        "• Move your mouse left↔right across Dingus.\n" +
+                        "• Every 5 back-and-forth strokes: +1 Happiness and ✨ sparkles appear.\n\n" +
+
+                        "ACCESSORIES\n" +
+                        "• Equip hats you own.\n" +
+                        "• Customize hat size + color.\n" +
+                        "• Use “Set Hat Position” to place the hat separately for sitting/bed/drag poses.\n\n" +
+
+                        "DEATH (PERMANENT)\n" +
+                        "• If Hunger, Happiness, and Energy all drop below 20, Dingus permanently dies.\n" +
+                        "• You get one final notification.\n" +
+                        "• Future launches show a dead screen.\n\n" +
+
+                        "Next: you can run baseline scans (recommended) or skip them."
+        );
+        guide.setWrapStyleWord(true);
+        guide.setLineWrap(true);
+        guide.setOpaque(false);
+        guide.setEditable(false);
+        guide.setFocusable(false);
+        guide.setForeground(Theme.TEXT_SECONDARY);
+        guide.setFont(Theme.font(Theme.FONT_SIZE_BODY));
+
+        JScrollPane scroll = new JScrollPane(guide);
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        scroll.getVerticalScrollBar().setPreferredSize(new Dimension(Theme.SCROLLBAR_WIDTH, 0));
+
+        p.add(scroll, BorderLayout.CENTER);
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
+        buttonPanel.setOpaque(false);
+
+        JButton back = makeButton("⬅ Back", () -> cardLayout.show(cardPanel, "intro"));
+        back.setBackground(Theme.BTN_DEFAULT);
+
+        JButton skipScans = makeButton("Skip Scans ⏭", () -> {
+            tutorialSeen = true;          // lock tutorial as “seen”
+            newStats.setBaseRam(0);
+            newStats.setBaseCpu(0);
+            cardLayout.show(cardPanel, "custom");
+        });
+        skipScans.setBackground(Theme.BTN_SECONDARY);
+
+        JButton startScan = makeButton("Start Scan", () -> {
+            tutorialSeen = true;          // lock tutorial as “seen”
+            cardLayout.show(cardPanel, "ram");
+            runRamTest();
+        });
+        startScan.setBackground(Theme.BTN_PRIMARY);
+
+        buttonPanel.add(back);
+        buttonPanel.add(skipScans);
+        buttonPanel.add(startScan);
+
+        p.add(buttonPanel, BorderLayout.SOUTH);
+        return p;
     }
 
     // ── RAM Scan ────────────────────────────────────────────────
@@ -175,6 +250,10 @@ public class SetupWizard extends JDialog {
         ramNextBtn.setPreferredSize(new Dimension(140, 35));
 
         ramSkipBtn = makeButton("Skip ⏭", () -> {
+            // Tutorial cannot be skipped because RAM card is only reachable from tutorial,
+            // but keep this guard anyway:
+            if (!tutorialSeen) { cardLayout.show(cardPanel, "tutorial"); return; }
+
             if (ramWorker != null) ramWorker.cancel(true);
             newStats.setBaseRam(0);
             cardLayout.show(cardPanel, "cpu");
@@ -278,11 +357,15 @@ public class SetupWizard extends JDialog {
         JPanel btns = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
         btns.setOpaque(false);
 
-        cpuNextBtn = makeButton("Next: Customize ➡", () -> cardLayout.show(cardPanel, "custom"));
+        cpuNextBtn = makeButton("Next: Customize ➡", () -> {
+            if (!tutorialSeen) { cardLayout.show(cardPanel, "tutorial"); return; }
+            cardLayout.show(cardPanel, "custom");
+        });
         cpuNextBtn.setEnabled(false);
         cpuNextBtn.setPreferredSize(new Dimension(170, 35));
 
         cpuSkipBtn = makeButton("Skip ⏭", () -> {
+            if (!tutorialSeen) { cardLayout.show(cardPanel, "tutorial"); return; }
             if (cpuWorker != null) cpuWorker.cancel(true);
             newStats.setBaseCpu(0);
             cardLayout.show(cardPanel, "custom");
@@ -385,6 +468,8 @@ public class SetupWizard extends JDialog {
         p.add(new JLabel());                     p.add(new JLabel());
 
         JButton nextBtn = makeButton("Next: Place Bed ➡", () -> {
+            if (!tutorialSeen) { cardLayout.show(cardPanel, "tutorial"); return; }
+
             newStats.setName(nameField.getText());
             newStats.setGender((String) genderBox.getSelectedItem());
             newStats.setSpriteColor((String) colorBox.getSelectedItem());
@@ -396,6 +481,7 @@ public class SetupWizard extends JDialog {
         nextBtn.setBackground(Theme.BTN_PRIMARY);
 
         JButton skipPlacement = makeButton("Skip Placement", () -> {
+            if (!tutorialSeen) { cardLayout.show(cardPanel, "tutorial"); return; }
             finished = true;
             dispose();
         });
@@ -406,7 +492,7 @@ public class SetupWizard extends JDialog {
         return p;
     }
 
-    // ── Bed Placement step (ONLY bed placement) ─────────────────
+    // ── Bed Placement ───────────────────────────────────────────
 
     private JPanel buildBedPlacementCard() {
         JPanel p = new JPanel(new BorderLayout(0, 12));
@@ -458,7 +544,6 @@ public class SetupWizard extends JDialog {
         back.setBackground(Theme.BTN_DEFAULT);
 
         JButton finishBtn = makeButton("Start Game!", () -> {
-            // done – bed pos may or may not be set; if not set you can fallback in BedDialog.
             finished = true;
             dispose();
         });
@@ -473,19 +558,11 @@ public class SetupWizard extends JDialog {
 
     private BufferedImage loadBedForColor(String spriteColor) {
         try {
-            String path;
-
-            if (spriteColor == null) {
-                path = "dingus - Copy/orangebed.png";
-            } else {
-                path = switch (spriteColor) {
-                    case "Void (Black)"  -> "dingus - Copy/blackbed.png";
-                    case "Ghost (White)" -> "dingus - Copy/whitebed.png";
-                    case "Default (Orange)" -> "dingus - Copy/orangebed.png";
-                    default -> "dingus - Copy/orangebed.png";
-                };
-            }
-
+            String path = switch (spriteColor) {
+                case "Void (Black)"  -> "dingus - Copy/blackbed.png";
+                case "Ghost (White)" -> "dingus - Copy/whitebed.png";
+                default -> "dingus - Copy/orangebed.png";
+            };
             return ImageIO.read(new File(path));
         } catch (Exception e) {
             return null;

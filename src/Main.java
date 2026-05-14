@@ -69,7 +69,22 @@ public class Main {
             PetPanel panel = new PetPanel(dialog);
             panel.setOpaque(false);
             dialog.add(panel, BorderLayout.CENTER);
+            PetStats loaded = SaveManager.load();
+            if (loaded != null && loaded.isDead()) {
+                SwingUtilities.invokeLater(() -> {
+                    panel.ensureMenuOpen(); // shows dead menu (with traffic lights)
+                    Rectangle u = Theme.getUsableScreen();
+                    dialog.setLocation(
+                            u.x + (u.width - dialog.getWidth()) / 2,
+                            u.y + (u.height - dialog.getHeight()) / 2
+                    );
+                    dialog.toFront();
+                });
+            }
 
+            if (loaded != null && loaded.isDead()) {
+                bed.setVisible(false);
+            }
             // Give panel bed reference (panel will keep bed hidden at start because isInBed=true)
             panel.setBedDialog(bed);
 
